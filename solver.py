@@ -17,6 +17,7 @@ from scipy.integrate import trapz
 from scipy.interpolate import interp1d
 from scipy.sparse import dia_matrix, lil_matrix
 from scipy.optimize import fsolve, fmin_l_bfgs_b
+from scipy.linalg import inv
 
 from process import Process
 from target import Target, CombinedTarget
@@ -91,8 +92,7 @@ class BoltzmannSolver(object):
         self.DA = (GAMMA / 3. * self.EN**2 * self.benergy)
 
         # This is the independent term
-        self.DB = (GAMMA * self.kT * self.benergy**2 * self.sigma_eps
-                   / co.elementary_charge)
+        self.DB = (GAMMA * self.kT * self.benergy**2 * self.sigma_eps)
 
         logging.info("Solver succesfully initialized/updated")
 
@@ -105,18 +105,14 @@ class BoltzmannSolver(object):
         return (2 * np.sqrt(self.cenergy / np.pi)
                 * kT**(-3./2.) * np.exp(-self.cenergy / kT))
 
-    def iterate(self, f0):
-        def residual(f):
-            A, Q = self.linsystem(f)
-            r = A.dot(f) - Q.dot(f)
-            logging.info("New linsystem calculated (delta=%g)"
-                         % (sum(r**2)))
-            return sum(r**2)
 
-        bounds = [(0, None) for _ in f0]
-        f1 = fmin_l_bfgs_b(residual, f0, bounds=bounds, approx_grad=True,
-                           pgtol=1e-50)
-        return f1
+    def iterate(self, f0):
+        A, Q = self.linsystem(f0)
+        Qinv = inv(Q.todense())
+        T = np.dot(A, f0)
+        R = np.dot(Qinv, T)
+
+        return R
 
 
     def linsystem(self, F):
@@ -124,7 +120,7 @@ class BoltzmannSolver(object):
         nu_bar = self.nu_bar(F_func)
         sigma_tilde = self.sigma_tilde(F_func)
         A = self.scharf_gummel(F, sigma_tilde)
-
+        
         if np.any(np.isnan(A.todense())):
             raise ValueError("NaN found in A")
 
@@ -161,7 +157,11 @@ class BoltzmannSolver(object):
         a0 = self.W / (1 - np.exp(-z))
         a1 = self.W / (1 - np.exp(z))
 
-
+        print "W=", self.W
+        print "z=", z
+        print "D=", D
+        print "DA=", self.DA
+        print "DB=", self.DB
         #A = lil_matrix((self.n, self.n))
         diags = np.empty((3, self.n))
         diags[0, :] = a0[:-1] - a1[1:]
