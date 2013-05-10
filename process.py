@@ -23,11 +23,9 @@ class Process(object):
         self.product = product
         self.threshold = threshold
         self.weight_ratio = weight_ratio
-
         self.interp = padinterp(self.data)
         self.isnull = False
 
-        
         if np.amin(self.data[:, 0]) < 0:
             raise ValueError("Negative energy in the cross section %s"
                              % str(self))
@@ -94,6 +92,8 @@ class ScaledProcess(Process):
 
         newdata = orig.data.copy()
         newdata[:, 1] *= factor
+        self.orig = orig
+        self.factor = factor
 
         super(ScaledProcess, self).__init__(target=orig.target_name, 
                                             kind=orig.kind, 
@@ -103,8 +103,6 @@ class ScaledProcess(Process):
                                             product=orig.product, 
                                             threshold=orig.threshold, 
                                             weight_ratio=orig.weight_ratio)
-        self.orig = orig
-        self.factor = factor
 
     def __str__(self):
         return "{%s * %s}" % (str(self.factor), str(self.orig))
@@ -121,6 +119,11 @@ class CombinedProcess(Process):
         her_x = she.data[:, 0].copy()
         her_y = she.data[:, 1].copy()
         
+        # We have to avoid data repetition here.
+        only_hers = np.logical_not(np.in1d(her_x, his_x))
+        her_x = her_x[only_hers]
+        her_y = her_y[only_hers]
+
         his_y = his_y + she.interp(his_x)
         her_y = her_y + he.interp(her_x)
 
@@ -128,10 +131,13 @@ class CombinedProcess(Process):
         our_y = np.r_[his_y, her_y]
 
         isort = np.argsort(our_x)
-
+        
         data = np.c_[our_x[isort], our_y[isort]]
         target = ' '.join({he.target_name, she.target_name})
         kind = ' '.join({he.kind, she.kind})
+
+        self.he = he
+        self.she = she
 
         # Many properties here stop making sense now, so we set them as None
         super(CombinedProcess, self).__init__(target=target, 
@@ -143,8 +149,6 @@ class CombinedProcess(Process):
                                               threshold=None, 
                                               weight_ratio=None)
 
-        self.he = he
-        self.she = she
 
     def __str__(self):
         return "{%s + %s}" % (str(self.he), str(self.she))
