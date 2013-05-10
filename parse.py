@@ -5,19 +5,30 @@
 import sys
 import re
 import numpy as np
+import logging
+
 
 def parse(fp):
+    """ Parses a BOLSIG+ cross-sections file.  Returns a list of processes where
+    each process is represented by a dictionary with the relevant attributes.
+    """
     processes = []
     for line in fp:
         try:
             key = line.strip()
             fread = KEYWORDS[key]
+
+            # If the key is not found, we do not reach this line.
+            logging.debug("New process of type '%s'" % key)
+
             d = fread(fp)
-            d['type'] = key
+            d['kind'] = key
             processes.append(d)
             
         except KeyError:
             pass
+
+    logging.info("Parsing complete. %d processes read." % len(processes))
 
     return processes
 
@@ -46,7 +57,7 @@ def read_block(fp, has_arg=True):
 
     comment = "\n".join(read_until_sep(fp))
 
-    #data = "\n".join(read_until_sep(fp))
+    logging.debug("Read process '%s'" % target)
     data = np.loadtxt(read_until_sep(fp)).tolist()
 
     return target, arg, comment, data
@@ -58,9 +69,9 @@ def read_block(fp, has_arg=True):
 def read_momentum(fp):
     """ Reads a MOMENTUM or EFFECTIVE block. """
     target, arg, comment, data = read_block(fp, has_arg=True)
-    ratio = float(arg.split()[0])
+    mass_ratio = float(arg.split()[0])
     d = dict(target=target,
-             ratio=ratio,
+             mass_ratio=mass_ratio,
              comment=comment,
              data=data)
 
@@ -91,9 +102,16 @@ def read_attachment(fp):
     """ Reads an ATTACHMENT block. """
     target, arg, comment, data = read_block(fp, has_arg=False)
 
-    d = dict(target=target,
-             comment=comment,
-             data=data)
+    d = dict(comment=comment,
+             data=data,
+             threshold=0.0)
+    lr = [s.strip() for s in RE_ARROW.split(target)]
+
+    if len(lr) == 2:
+        d['target'] = lr[0]
+        d['product'] = lr[1]
+    else:
+        d['target'] = target
 
     return d
 
@@ -110,6 +128,10 @@ KEYWORDS = {"MOMENTUM": read_momentum,
 def main():
     import json
     import yaml
+
+    logging.basicConfig(format='[%(asctime)s] %(message)s', 
+                        datefmt='%a, %d %b %Y %H:%M:%S',
+                        level=logging.DEBUG)
 
     with open(sys.argv[1]) as fp:
         processes = parse(fp)

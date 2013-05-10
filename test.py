@@ -17,7 +17,7 @@ def main():
     with open(sys.argv[1]) as fp:
         processes = parse.parse(fp)
 
-    bsolver = solver.BoltzmannSolver(0, 100.0)
+    bsolver = solver.BoltzmannSolver(80.0, n=128)
     bsolver.load_collisions(processes)
 
     bsolver.target['N2'].density = 0.8
@@ -29,18 +29,14 @@ def main():
     bsolver.init()
     pexc = bsolver.target['N2'].combined_process('EXCITATION')
 
+    for p in bsolver.total.inelastic:
+        print str(p), p.threshold
 
-    
-    print bsolver.total.name
-    p = bsolver.total
-    #p = bsolver.target['N2']
+    f0 = bsolver.maxwell(10.0)
+    f1, minval, d = bsolver.iterate(f0)
 
-    pylab.subplot(111)
-    p.all_all.plot(pylab.gca(), '-o', lw=1.8, c='b')
-    p.all_ionization.plot(pylab.gca(), '-o', lw=1.8, c='k')
-    p.all_excitation.plot(pylab.gca(), '-o', lw=1.8, c='#aa77aa')
-    p.all_inelastic.plot(pylab.gca(), '-o', lw=1.8, c='g')
-    p.all_elastic.plot(pylab.gca(), '-o', lw=1.8, c='r')
+    pylab.plot(bsolver.cenergy, f0, lw=2.0, c='k')
+    pylab.plot(bsolver.cenergy, f1, lw=2.0, c='r')
 
     pylab.show()
 

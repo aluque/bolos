@@ -70,8 +70,6 @@ class Target(object):
             for t in self.pair:
                 t.set_energy_grid(eps)
 
-            return
-
         for key, plist in self.kind.iteritems():
             for proc in plist:
                 proc.set_energy_grid(eps)

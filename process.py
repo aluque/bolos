@@ -27,6 +27,7 @@ class Process(object):
         self.interp = padinterp(self.data)
         self.isnull = False
 
+        
         if np.amin(self.data[:, 0]) < 0:
             raise ValueError("Negative energy in the cross section %s"
                              % str(self))
@@ -56,16 +57,22 @@ class Process(object):
         if interval is None:
             interval = [self.x[0], self.x[-1]]
 
+        # logging.debug("interval = %s" % repr(interval))
+
         inflt = np.logical_and(self.xeps > interval[0], self.xeps < interval[1])
-        x = r_[interval[0], self.xeps[inflt], interval[1]]
+        x = np.r_[interval[0], self.xeps[inflt], interval[1]]
         
-        sigma = r_[self.interp(interval[0]), self.yeps[inflt], 
-                   self.interp(interval[1])]
+        sigma = np.r_[[self.interp(interval[0])], self.yeps[inflt], 
+                      [self.interp(interval[1])]]
         Fx = F(x)
 
-        return int_linexp(x[:-1], x[1:], 
-                          sigma[:-1], sigma[1:], 
-                          Fx[:-1], Fx[1:])
+        # logging.debug("x = %s" % repr(x))
+        # logging.debug("sigma = %s" % repr(sigma))
+        # logging.debug("Fx = %s" % repr(Fx))
+
+        return np.sum(int_linexp(x[:-1], x[1:], 
+                                 sigma[:-1], sigma[1:], 
+                                 Fx[:-1], Fx[1:]))
 
                           
 
@@ -177,15 +184,20 @@ def padinterp(data):
 
     return interp1d(x, y, kind='linear')
 
+import numexpr
 
 def int_linexp(a, b, u0, u1, F0, F1):
     """ This is the integral in [a, b] of u(x) * F(x) * x assuming that
     u is linear with u({a, b}) = {u0, u1} and F is exponential
     with F({a, b}) = {F0, F1}. """
     ab = a - b
-    logF1F0 = log(F1 / F0)
+    logF1F0 = np.log(F1 / F0)
     
-    return ((ab*(2*ab*(F0 - F1)*(u0 - u1) + 
-                Log(F1/F0)*(2*a*F0*u0 - b*(F0 + F1)*u0 + 2*b*F1*u1 - 
-                            a*(F0 + F1)*u1 + (a*F0*u0 - b*F1*u1)*LogF1F0)))/
-            LogF1F0**3)
+
+    r = ((ab*(2*ab*(F0 - F1)*(u0 - u1) + 
+              logF1F0*(2*a*F0*u0 - b*(F0 + F1)*u0 + 2*b*F1*u1 - 
+                       a*(F0 + F1)*u1 + (a*F0*u0 - b*F1*u1)*logF1F0)))/
+         logF1F0**3)
+
+    # Where either F0 or F1 is 0 we return 0
+    return np.where(np.isnan(r), 0.0, r)

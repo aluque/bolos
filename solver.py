@@ -15,6 +15,8 @@ import numpy as np
 import scipy.constants as co
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
+from scipy.sparse import dia_matrix, lil_matrix
+from scipy.optimize import fsolve, fmin_l_bfgs_b
 
 from process import Process
 from target import Target, CombinedTarget
@@ -82,6 +84,7 @@ class BoltzmannSolver(object):
         self.total.set_energy_grid(self.cenergy)
 
         self.sigma_eps = self.total.all_weighted_elastic.interp(self.benergy)
+        self.sigma_m = self.total.all_all.interp(self.benergy)
         self.W = -GAMMA * self.benergy**2 * self.sigma_eps
         
         # This is the coeff of sigma_tilde
@@ -98,17 +101,103 @@ class BoltzmannSolver(object):
     # Here are the functions that depend on F0 and are therefore
     # called in each iteration.  These are all pure-functions without
     # side-effects and without changing the state of self
-    def nu_bar(self, F0):
+    def maxwell(self, kT):
+        return (2 * np.sqrt(self.cenergy / np.pi)
+                * kT**(-3./2.) * np.exp(-self.cenergy / kT))
+
+    def iterate(self, f0):
+        def residual(f):
+            A, Q = self.linsystem(f)
+            r = A.dot(f) - Q.dot(f)
+            logging.info("New linsystem calculated (delta=%g)"
+                         % (sum(r**2)))
+            return sum(r**2)
+
+        bounds = [(0, None) for _ in f0]
+        f1 = fmin_l_bfgs_b(residual, f0, bounds=bounds, approx_grad=True,
+                           pgtol=1e-50)
+        return f1
+
+
+    def linsystem(self, F):
+        F_func = self.F_as_func(F)
+        nu_bar = self.nu_bar(F_func)
+        sigma_tilde = self.sigma_tilde(F_func)
+        A = self.scharf_gummel(F, sigma_tilde)
+
+        if np.any(np.isnan(A.todense())):
+            raise ValueError("NaN found in A")
+
+        Q = self.PQ(F_func)
+        if np.any(np.isnan(Q.todense())):
+            raise ValueError("NaN found in Q")
+
+        return A, Q
+
+
+    def F_as_func(self, F):
+        """ Builds a log interpolator for F. """
+        logF = np.log(F)
+        logF_func = interp1d(self.cenergy, logF, 
+                             kind='linear', bounds_error=False,
+                             fill_value=-np.inf)
+        def F_func(x):
+            return np.exp(logF_func(x))
+
+        return F_func
+
+
+    def nu_bar(self, F0_func):
         """ Calculates nu_bar/N/GAMMA from F0. """
-        return (self.total.all_ionization.int_exp(F0)
-                - self.total.all_attachment.int_exp(F0))
+        return (self.total.all_ionization.int_exp(F0_func)
+                - self.total.all_attachment.int_exp(F0_func))
 
 
-    def sigma_tilde(self, F0):
-        nu = self.nu_bar(F0)
-        return self.sigma_m + nu / sqrt(self.benergy)
+    def scharf_gummel(self, F0, sigma_tilde):
+        D = self.DA / sigma_tilde + self.DB
+
+        # Assuming here that the grid is homogeneous
+        z = self.W * self.denergy[0] / D
+        a0 = self.W / (1 - np.exp(-z))
+        a1 = self.W / (1 - np.exp(z))
 
 
-    def P(self, F0):
-        pass
-    
+        #A = lil_matrix((self.n, self.n))
+        diags = np.empty((3, self.n))
+        diags[0, :] = a0[:-1] - a1[1:]
+        diags[1, :] = a1[:-1]
+        diags[2, :] = a0[1:]
+
+        A = dia_matrix((self.n, self.n), (diags, [0, 1, -1]))
+        return A
+
+
+    def sigma_tilde(self, F0_func):
+        nu = self.nu_bar(F0_func)
+        return self.sigma_m + nu / np.sqrt(self.benergy)
+
+
+    def PQ(self, F0_func):
+        P = np.empty_like(self.cenergy)
+        Q = lil_matrix((self.n, self.n))
+
+        for i in xrange(self.n):
+            Q[i, i] += self.total.all_inelastic.int_exp(
+                F0_func, interval=[self.benergy[i], self.benergy[i + 1]])
+
+            for k in self.total.inelastic:
+                for j in xrange(i - int(np.ceil(k.threshold 
+                                                / self.denergy[0])), 
+                                i + 1):
+                    eps1 = min(max(self.benergy[i] + k.threshold,
+                                   self.benergy[j]),
+                               self.benergy[i + 1])
+                    eps2 = min(max(self.benergy[i + 1] + k.threshold,
+                                   self.benergy[j]),
+                               self.benergy[i + 1])
+
+                    if eps1 == eps2:
+                        continue
+                    Q[i, j] += k.int_exp(F0_func, interval=[eps1, eps2])
+
+        return Q.tocsr()
