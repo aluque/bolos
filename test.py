@@ -1,10 +1,16 @@
 import sys
 import logging
 
+import numpy as np
 import pylab
 import scipy.constants as co
 import parse
 import solver
+import grid
+
+from matplotlib import cm
+
+from IPython import embed
 
 def main():
     import json
@@ -17,7 +23,10 @@ def main():
     with open(sys.argv[1]) as fp:
         processes = parse.parse(fp)
 
-    bsolver = solver.BoltzmannSolver(80.0, n=128)
+    
+    gr = grid.LinearGrid(0, 40., 200)
+
+    bsolver = solver.BoltzmannSolver(gr)
     bsolver.load_collisions(processes)
 
     bsolver.target['N2'].density = 0.8
@@ -27,20 +36,23 @@ def main():
     bsolver.kT = 300 * co.k / co.eV
 
     bsolver.init()
-    pexc = bsolver.target['N2'].combined_process('EXCITATION')
 
-    for p in bsolver.total.inelastic:
-        print str(p), p.threshold
+    f0 = bsolver.maxwell(2.0)
+    f1 = bsolver.converge(f0, maxn=50, rtol=1e-7)
 
-    f0 = bsolver.maxwell(10.0)
-    f1, minval, d = bsolver.iterate(f0)
+    eng, eedf, _ = np.loadtxt("prelim/output.dat",
+                              unpack=True, skiprows=2)
 
-    pylab.plot(bsolver.cenergy, f0, lw=2.0, c='k')
-    pylab.plot(bsolver.cenergy, f1, lw=2.0, c='r')
+    pylab.figure(2)
 
+    pylab.plot(bsolver.cenergy, f1, lw=1.75, c='r')
+    pylab.plot(eng, eedf, '--', lw=2.0, c='k')
+
+    pylab.semilogy()
+    pylab.xlim([0, 30])
+    pylab.ylim([5e-4, 1])
     pylab.show()
 
-    
 
 if __name__ == '__main__':
     main()

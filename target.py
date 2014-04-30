@@ -136,7 +136,7 @@ class Target(object):
             setattr(self, 'all_%s' % key.lower(), proc)
             self.combined[key] = proc
 
-        self.all_inelastic = reduce(CombinedProcess,
+        self.all_inelastic = reduce(CombinedProcess.maybe_null,
                                     [self.all_attachment, 
                                      self.all_excitation,
                                      self.all_ionization])

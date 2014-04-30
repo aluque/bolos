@@ -3,6 +3,7 @@
     described by Hagelaar and Pitchford (2005), henceforth referred
     as H&P. """
 
+import sys
 import logging
 
 from math import sqrt
@@ -15,33 +16,39 @@ import numpy as np
 import scipy.constants as co
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
-from scipy.sparse import dia_matrix, lil_matrix
+from scipy import sparse
 from scipy.optimize import fsolve, fmin_l_bfgs_b
 from scipy.linalg import inv
 
 from process import Process
 from target import Target, CombinedTarget
 
+# For debugging only: remove later
+import pylab
+
+from IPython import embed
+
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
 TOWNSEND = 1e-21
 
 
 class BoltzmannSolver(object):
-    def __init__(self, max_energy, n=1000):
+    def __init__(self, grid):
         self.density = dict()
-        self.max_energy = max_energy
-        self.n = n
+        self.n = grid.n
         
         self.EN = None
 
+        self.grid = grid
+
         # These are cell boundary values at i - 1/2
-        self.benergy = np.linspace(0, max_energy, n + 1)
+        self.benergy = self.grid.b
 
         # these are cell centers
-        self.cenergy = 0.5 * (self.benergy[1:] + self.benergy[:-1])
+        self.cenergy = self.grid.c
 
         # And these are the deltas
-        self.denergy = np.diff(self.benergy)
+        self.denergy = self.grid.d
 
         # A dictionary with target_name -> target
         self.target = {}
@@ -61,9 +68,14 @@ class BoltzmannSolver(object):
     def combine_all_targets(self):
         """ Combine all targets to create a mega-target that includes all
         collisions. """
-        self.total = reduce(CombinedTarget, 
-                            (t for t in self.target.values() if t.density > 0))
 
+        if len(self.target) == 1:
+            self.total = self.target.values()[0]
+        else:
+            self.total = reduce(CombinedTarget, 
+                                (t for t in self.target.values() 
+                                 if t.density > 0))
+        self.total.combine_all()
 
 
     def new_process_from_dict(self, d):
@@ -102,102 +114,167 @@ class BoltzmannSolver(object):
     # called in each iteration.  These are all pure-functions without
     # side-effects and without changing the state of self
     def maxwell(self, kT):
-        return (2 * np.sqrt(self.cenergy / np.pi)
+        return (2 * np.sqrt(1 / np.pi)
                 * kT**(-3./2.) * np.exp(-self.cenergy / kT))
 
 
-    def iterate(self, f0):
+    def iterate(self, f0, eps=1e15):
         A, Q = self.linsystem(f0)
-        Qinv = inv(Q.todense())
-        T = np.dot(A, f0)
-        R = np.dot(Qinv, T)
 
-        return R
+        f1 = sparse.linalg.spsolve(sparse.eye(self.n) + eps * A - eps * Q, f0)
+        return self.normalized(f1)
+
+    
+    def converge(self, f0, maxn=100, rtol=1e-5, **kwargs):
+        """ Iterates the attempted solution f0 until convergence is reached or
+        maxn iterations are consumed.  """
+        from matplotlib import cm
+        pylab.figure(1)
+
+        for i in xrange(maxn):
+            pylab.plot(self.cenergy, f0, lw=1.8, c=cm.jet(float(i) / maxn))
+
+            f1 = self.iterate(f0, **kwargs)
+            err = self.norm(abs(f0 - f1))
+            
+            logging.debug("After iteration %3d, err = %g (target: %g)" 
+                          % (i + 1, err, rtol))
+            if err < rtol:
+                logging.info("Convergence achieved after %d iterations. "
+                             "err = %g" % (i + 1, err))
+                return f1
+            f0 = f1
+            
+        logging.error("Convergence failed")
 
 
     def linsystem(self, F):
-        F_func = self.F_as_func(F)
-        nu_bar = self.nu_bar(F_func)
-        sigma_tilde = self.sigma_tilde(F_func)
-        A = self.scharf_gummel(F, sigma_tilde)
+        Q = self.PQ(F)
+
+        if np.any(np.isnan(Q.todense())):
+            raise ValueError("NaN found in Q")
+
+        nu = np.sum(Q.dot(F)) / GAMMA
+
+        logging.debug("Growth factor nu = %g" % (GAMMA * nu))
+        sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy)
+
+        A = self.scharf_gummel(sigma_tilde)
         
         if np.any(np.isnan(A.todense())):
             raise ValueError("NaN found in A")
 
-        Q = self.PQ(F_func)
-        if np.any(np.isnan(Q.todense())):
-            raise ValueError("NaN found in Q")
-
         return A, Q
 
 
-    def F_as_func(self, F):
-        """ Builds a log interpolator for F. """
-        logF = np.log(F)
-        logF_func = interp1d(self.cenergy, logF, 
-                             kind='linear', bounds_error=False,
-                             fill_value=-np.inf)
-        def F_func(x):
-            return np.exp(logF_func(x))
-
-        return F_func
+    def norm(self, f):
+        return np.sum(f * np.sqrt(self.cenergy) * self.denergy)
 
 
-    def nu_bar(self, F0_func):
+    def normalized(self, f):
+        return f / self.norm(f)
+
+
+    def nu_bar(self, F0):
         """ Calculates nu_bar/N/GAMMA from F0. """
-        return (self.total.all_ionization.int_exp(F0_func)
-                - self.total.all_attachment.int_exp(F0_func))
+        g = self.g(F0)
+
+        intervals = np.c_[self.benergy[:-1], self.benergy[1:]]
+        S = 0
+        for i, interval in enumerate(intervals):
+            S += self.total.all_ionization.int_exp0(g[i], self.cenergy[i],
+                                                    interval) * F0[i]
+            S -= self.total.all_attachment.int_exp0(g[i], self.cenergy[i],
+                                                    interval) * F0[i]
+
+        return S
 
 
-    def scharf_gummel(self, F0, sigma_tilde):
-        D = self.DA / sigma_tilde + self.DB
+    def scharf_gummel(self, sigma_tilde):
+        D = self.DA / (sigma_tilde) + self.DB
 
-        # Assuming here that the grid is homogeneous
-        z = self.W * self.denergy[0] / D
+        # Due to the zero flux b.c. the values of z[0] and z[-1] are never used.
+        # To make sure, we set is a nan so it will taint everything if ever 
+        # used.
+        # TODO: Perhaps it would be easier simply to set the appropriate
+        # values here to satisfy the b.c.
+        z  = self.W * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+
         a0 = self.W / (1 - np.exp(-z))
         a1 = self.W / (1 - np.exp(z))
 
-        print "W=", self.W
-        print "z=", z
-        print "D=", D
-        print "DA=", self.DA
-        print "DB=", self.DB
-        #A = lil_matrix((self.n, self.n))
-        diags = np.empty((3, self.n))
-        diags[0, :] = a0[:-1] - a1[1:]
-        diags[1, :] = a1[:-1]
-        diags[2, :] = a0[1:]
+        diags = np.zeros((3, self.n))
 
-        A = dia_matrix((self.n, self.n), (diags, [0, 1, -1]))
+        # No flux at the energy = 0 boundary
+        diags[0, 0]  = a0[1]
+
+        diags[0, 1:] =  a0[2:]  - a1[1:-1]
+        diags[1, :]  =  a1[:-1]
+        diags[2, :]  = -a0[1:]
+
+        # F[n+1] = 2 * F[n] + F[n-1] b.c.
+        # diags[2, -2] -= a1[-1]
+        # diags[0, -1] += 2 * a1[-1]
+
+        # F[n+1] = F[n] b.c.
+        # diags[0, -1] += a1[-1]
+
+        # zero flux b.c.
+        diags[2, -2] = -a0[-2]
+        diags[0, -1] = -a1[-2]
+
+        A = sparse.dia_matrix((diags, [0, 1, -1]), shape=(self.n, self.n))
+
         return A
 
 
-    def sigma_tilde(self, F0_func):
-        nu = self.nu_bar(F0_func)
+    def sigma_tilde(self, F0):
+        nu = self.nu_bar(F0)
+        print "nu = %g\n" % (GAMMA * nu)
+
         return self.sigma_m + nu / np.sqrt(self.benergy)
 
 
-    def PQ(self, F0_func):
-        P = np.empty_like(self.cenergy)
-        Q = lil_matrix((self.n, self.n))
+    def g(self, F0):
+        Fp = np.r_[F0[0], F0, F0[-1]]
+        cenergyp = np.r_[self.cenergy[0], self.cenergy, self.cenergy[-1]]
+        g = np.log(Fp[2:] / Fp[:-2]) / (cenergyp[2:] - cenergyp[:-2])
+        
+        return g
+
+
+    def PQ(self, F0):
+        Q = sparse.lil_matrix((self.n, self.n))
+        g = self.g(F0)
 
         for i in xrange(self.n):
-            Q[i, i] += self.total.all_inelastic.int_exp(
-                F0_func, interval=[self.benergy[i], self.benergy[i + 1]])
-
             for k in self.total.inelastic:
-                for j in xrange(i - int(np.ceil(k.threshold 
-                                                / self.denergy[0])), 
-                                i + 1):
-                    eps1 = min(max(self.benergy[i] + k.threshold,
-                                   self.benergy[j]),
-                               self.benergy[i + 1])
-                    eps2 = min(max(self.benergy[i + 1] + k.threshold,
-                                   self.benergy[j]),
-                               self.benergy[i + 1])
+                in_factor = k.in_factor
 
-                    if eps1 == eps2:
+                # This is the the range of energies where a collision
+                # would add a particle to cell i.
+                # The 1e-9 appears in eps_b to make sure that it is contained
+                # in the open interval (0, self.benergy[-1])
+                eps_a = k.shift_factor * self.benergy[i] + k.threshold
+                eps_b = min(k.shift_factor * self.benergy[i + 1] + k.threshold,
+                            self.benergy[-1] - 1e-9)
+
+                # And these are the cells where these energies are located
+                ja = self.grid.cell(eps_a)
+                jb = self.grid.cell(eps_b)
+
+                for j in xrange(ja, jb + 1):
+                    eps1 = max(eps_a, self.benergy[j])
+                    eps2 = min(eps_b, self.benergy[j + 1])
+
+                    if eps1 > eps2:
                         continue
-                    Q[i, j] += k.int_exp(F0_func, interval=[eps1, eps2])
+
+                    r = GAMMA * k.int_exp0(g[j], self.cenergy[j],
+                                           interval=[eps1, eps2])
+                        
+                    Q[i, j] += in_factor * r 
+                    Q[j, j] -= r
+
 
         return Q.tocsr()
