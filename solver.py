@@ -89,15 +89,41 @@ class BoltzmannSolver(object):
 
         target.add_process(proc)
 
-    
+
+    def iter_elastic(self):
+        """ Iterates over all elastic processes yielding (target, process)
+        tuples. """
+        for target in self.target.values():
+            if target.density > 0:
+                for process in target.elastic:
+                    yield target, process
+
+    def iter_inelastic(self):
+        """ Iterates over all inelastic processes yielding (target, process)
+        tuples. """
+        for target in self.target.values():
+            if target.density > 0:
+                for process in target.inelastic:
+                    yield target, process
+
+
     def init(self):
         """ Does all the work previous to the actual iterations.
         The densities must be set at this point. """
         self.combine_all_targets()
         self.total.set_energy_grid(self.cenergy)
 
-        self.sigma_eps = self.total.all_weighted_elastic.interp(self.benergy)
-        self.sigma_m = self.total.all_all.interp(self.benergy)
+        self.sigma_eps = np.zeros_like(self.benergy)
+        self.sigma_m = np.zeros_like(self.benergy)
+        for target, process in self.iter_elastic():
+            s = target.density * process.interp(self.benergy)
+            self.sigma_eps += 2 * target.mass_ratio * s
+            self.sigma_m += s
+
+        for target, process in self.iter_inelastic():
+            self.sigma_m += target.density * process.interp(self.benergy)
+
+
         self.W = -GAMMA * self.benergy**2 * self.sigma_eps
         
         # This is the coeff of sigma_tilde
