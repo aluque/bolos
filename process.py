@@ -56,25 +56,9 @@ class Process(object):
                              % str(self))
  
         if np.amin(self.data[:, 1]) < 0:
-            print "The cross section data is:"
-            print self.data
             raise ValueError("Negative cross section for %s"
                              % str(self))
        
-
-    def set_energy_grid(self, eps):
-        """ Performs all computations needed for an energy grid;
-        this is to avoid repeated operations during the iterations. """
-        self.eps = eps
-        xeps = np.r_[self.x, eps]
-        yeps = np.r_[self.y, self.interp(eps)]
-
-        isort = np.argsort(xeps)
-        self.xeps = xeps[isort]
-        self.yeps = yeps[isort]
-
-        logging.debug("Energy grid set in %s" % str(self))
-
 
     def int_exp0(self, g, epsj, interval=None):
         """ Integrates sigma * eps * exp(g (epsj - eps)) in the given interval.
@@ -98,96 +82,9 @@ class Process(object):
 
 
 
-    def plot(self, ax, *args, **kwargs):
-        """ Plots the cross sections of this process into ax.  All kwargs
-        are passed to pylab's plot. """
-        ax.plot(self.data[:, 0], self.data[:, 1], *args, **kwargs)
-
-
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
                                 "-> " + self.product if self.product else "")
-
-
-class ScaledProcess(Process):
-    def __init__(self, orig, factor):
-        """ Returns a new process with the cross section scaled by a factor
-        factor.  Generally, factor will be a molar fraction. """
-
-        newdata = orig.data.copy()
-        newdata[:, 1] *= factor
-        self.orig = orig
-        self.factor = factor
-
-        super(ScaledProcess, self).__init__(target=orig.target_name, 
-                                            kind=orig.kind, 
-                                            data=newdata,
-                                            comment=orig.comment, 
-                                            mass_ratio=orig.mass_ratio,
-                                            product=orig.product, 
-                                            threshold=orig.threshold, 
-                                            weight_ratio=orig.weight_ratio)
-
-    def __str__(self):
-        return "{%s * %s}" % (str(self.factor), str(self.orig))
-
-
-class CombinedProcess(Process):
-    def __init__(self, he, she):
-        """ Initializes a process that combines this one with other.
-        The cross sections are interpolated, and then added. """
-
-        his_x = he.data[:, 0].copy()
-        his_y = he.data[:, 1].copy()
-
-        her_x = she.data[:, 0].copy()
-        her_y = she.data[:, 1].copy()
-        
-        # We have to avoid data repetition here.
-        only_hers = np.logical_not(np.in1d(her_x, his_x))
-        her_x = her_x[only_hers]
-        her_y = her_y[only_hers]
-
-        his_y = his_y + she.interp(his_x)
-        her_y = her_y + he.interp(her_x)
-
-        our_x = np.r_[his_x, her_x]
-        our_y = np.r_[his_y, her_y]
-
-        isort = np.argsort(our_x)
-        
-        data = np.c_[our_x[isort], our_y[isort]]
-        target = ' '.join({he.target_name, she.target_name})
-        kind = ' '.join({he.kind, she.kind})
-
-        self.he = he
-        self.she = she
-
-        # Many properties here stop making sense now, so we set them as None
-        super(CombinedProcess, self).__init__(target=target, 
-                                              kind=kind, 
-                                              data=data,
-                                              comment='', 
-                                              mass_ratio=None,
-                                              product=None, 
-                                              threshold=None, 
-                                              weight_ratio=None)
-
-
-    def __str__(self):
-        return "{%s + %s}" % (str(self.he), str(self.she))
-
-
-    @staticmethod
-    def maybe_null(he, she):
-        """ Checks if one of the processes is null before building a
-        CombinedProcess. """
-        if he.isnull:
-            return she
-        elif she.isnull:
-            return he
-        else:
-            return CombinedProcess(he, she)
 
 
 class NullProcess(Process):

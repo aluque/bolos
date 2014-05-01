@@ -21,7 +21,7 @@ from scipy.optimize import fsolve, fmin_l_bfgs_b
 from scipy.linalg import inv
 
 from process import Process
-from target import Target, CombinedTarget
+from target import Target
 
 # For debugging only: remove later
 import pylab
@@ -65,19 +65,6 @@ class BoltzmannSolver(object):
             item.ensure_elastic()
             
 
-    def combine_all_targets(self):
-        """ Combine all targets to create a mega-target that includes all
-        collisions. """
-
-        if len(self.target) == 1:
-            self.total = self.target.values()[0]
-        else:
-            self.total = reduce(CombinedTarget, 
-                                (t for t in self.target.values() 
-                                 if t.density > 0))
-        self.total.combine_all()
-
-
     def new_process_from_dict(self, d):
         """ Adds a new process from a dictionary with its properties. """
         proc = Process(**d)
@@ -110,8 +97,6 @@ class BoltzmannSolver(object):
     def init(self):
         """ Does all the work previous to the actual iterations.
         The densities must be set at this point. """
-        self.combine_all_targets()
-        self.total.set_energy_grid(self.cenergy)
 
         self.sigma_eps = np.zeros_like(self.benergy)
         self.sigma_m = np.zeros_like(self.benergy)
@@ -201,21 +186,6 @@ class BoltzmannSolver(object):
         return f / self.norm(f)
 
 
-    def nu_bar(self, F0):
-        """ Calculates nu_bar/N/GAMMA from F0. """
-        g = self.g(F0)
-
-        intervals = np.c_[self.benergy[:-1], self.benergy[1:]]
-        S = 0
-        for i, interval in enumerate(intervals):
-            S += self.total.all_ionization.int_exp0(g[i], self.cenergy[i],
-                                                    interval) * F0[i]
-            S -= self.total.all_attachment.int_exp0(g[i], self.cenergy[i],
-                                                    interval) * F0[i]
-
-        return S
-
-
     def scharf_gummel(self, sigma_tilde):
         D = self.DA / (sigma_tilde) + self.DB
 
@@ -254,13 +224,6 @@ class BoltzmannSolver(object):
         return A
 
 
-    def sigma_tilde(self, F0):
-        nu = self.nu_bar(F0)
-        print "nu = %g\n" % (GAMMA * nu)
-
-        return self.sigma_m + nu / np.sqrt(self.benergy)
-
-
     def g(self, F0):
         Fp = np.r_[F0[0], F0, F0[-1]]
         cenergyp = np.r_[self.cenergy[0], self.cenergy, self.cenergy[-1]]
@@ -274,7 +237,7 @@ class BoltzmannSolver(object):
         g = self.g(F0)
 
         for i in xrange(self.n):
-            for k in self.total.inelastic:
+            for t, k in self.iter_inelastic():
                 in_factor = k.in_factor
 
                 # This is the the range of energies where a collision
@@ -296,8 +259,8 @@ class BoltzmannSolver(object):
                     if eps1 > eps2:
                         continue
 
-                    r = GAMMA * k.int_exp0(g[j], self.cenergy[j],
-                                           interval=[eps1, eps2])
+                    r = t.density * GAMMA * k.int_exp0(g[j], self.cenergy[j],
+                                                       interval=[eps1, eps2])
                         
                     Q[i, j] += in_factor * r 
                     Q[j, j] -= r

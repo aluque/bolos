@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from process import Process, ScaledProcess, CombinedProcess, NullProcess
+from process import Process, NullProcess
 
 
 class Target(object):
@@ -49,30 +49,11 @@ class Target(object):
 
             self.mass_ratio = process.mass_ratio
 
-        if process.kind == 'ELASTIC':
-            f = self.mass_ratio or 1.0
-            p = ScaledProcess(process, 2 * f)
-            p.kind = 'WEIGHTED_ELASTIC'
-            p.mass_ratio = None
-            self.add_process(p)
-
         process.target = self
 
         logging.debug("Process %s added to target %s" 
                       % (str(process), str(self)))
 
-    def set_energy_grid(self, eps):
-        for key, proc in self.combined.iteritems():
-            proc.set_energy_grid(eps)
-
-        if hasattr(self, 'pair'):
-            # It's a coposite target
-            for t in self.pair:
-                t.set_energy_grid(eps)
-
-        for key, plist in self.kind.iteritems():
-            for proc in plist:
-                proc.set_energy_grid(eps)
         
 
     def ensure_elastic(self):
@@ -119,34 +100,6 @@ class Target(object):
         self.effective = []
 
 
-    def combined_process(self, kind):
-        """ Combines all processes of a given kind into a single process. """
-        if not self.kind[kind]:
-            # We make sure that we always return something that can be managed
-            logging.debug("No processes '%s' in target %s" % (kind, self.name))
-            return NullProcess(self.name, kind)
-
-        return reduce(CombinedProcess, self.kind[kind])
-    
-
-    def combine_all(self):
-        """ Combines all kinds of processes into CombinedProcesses. """
-        for key, item in self.kind.iteritems():
-            proc = self.combined_process(key)
-            setattr(self, 'all_%s' % key.lower(), proc)
-            self.combined[key] = proc
-
-        self.all_inelastic = reduce(CombinedProcess.maybe_null,
-                                    [self.all_attachment, 
-                                     self.all_excitation,
-                                     self.all_ionization])
-
-        self.all_all = CombinedProcess(self.all_elastic, self.all_inelastic)
-        
-        self.combined['INELASTIC'] = self.all_inelastic
-        self.combined['ALL'] = self.all_all
-
-
     @property
     def inelastic(self):
         """ An useful abbreviation. """
@@ -166,23 +119,3 @@ class Target(object):
     def __str__(self):
         return self.name
 
-
-class CombinedTarget(Target):
-    """ A class of two combined targets. """
-    def __init__(self, he, she):
-        name = "/".join([he.name, she.name])
-        super(CombinedTarget, self).__init__(name)
-
-        self.density = he.density + she.density
-
-        for key, item in self.kind.iteritems():
-            for p in he.kind[key]:
-                self.kind[key].append(
-                    ScaledProcess(p, he.density / self.density))
-
-            for p in she.kind[key]:
-                self.kind[key].append(
-                    ScaledProcess(p, she.density / self.density))
-        
-        self.combine_all()
-        self.pair = [he, she]
