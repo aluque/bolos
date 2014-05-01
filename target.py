@@ -30,8 +30,6 @@ class Target(object):
                      'EXCITATION': self.excitation,
                      'WEIGHTED_ELASTIC': self.weighted_elastic}
 
-        self.combined = {}
-
         logging.debug("Target %s created." % str(self))
 
     def add_process(self, process):

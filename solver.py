@@ -25,7 +25,6 @@ from target import Target
 
 # For debugging only: remove later
 import pylab
-
 from IPython import embed
 
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
@@ -107,7 +106,7 @@ class BoltzmannSolver(object):
 
         for target, process in self.iter_inelastic():
             self.sigma_m += target.density * process.interp(self.benergy)
-
+            process.set_grid_cache(self.grid)
 
         self.W = -GAMMA * self.benergy**2 * self.sigma_eps
         
@@ -140,11 +139,8 @@ class BoltzmannSolver(object):
         """ Iterates the attempted solution f0 until convergence is reached or
         maxn iterations are consumed.  """
         from matplotlib import cm
-        pylab.figure(1)
 
         for i in xrange(maxn):
-            pylab.plot(self.cenergy, f0, lw=1.8, c=cm.jet(float(i) / maxn))
-
             f1 = self.iterate(f0, **kwargs)
             err = self.norm(abs(f0 - f1))
             
@@ -233,37 +229,48 @@ class BoltzmannSolver(object):
 
 
     def PQ(self, F0):
-        Q = sparse.lil_matrix((self.n, self.n))
+        Q = sparse.dok_matrix((self.n, self.n))
+
         g = self.g(F0)
 
         for i in xrange(self.n):
             for t, k in self.iter_inelastic():
                 in_factor = k.in_factor
 
-                # This is the the range of energies where a collision
-                # would add a particle to cell i.
-                # The 1e-9 appears in eps_b to make sure that it is contained
-                # in the open interval (0, self.benergy[-1])
-                eps_a = k.shift_factor * self.benergy[i] + k.threshold
-                eps_b = min(k.shift_factor * self.benergy[i + 1] + k.threshold,
-                            self.benergy[-1] - 1e-9)
-
-                # And these are the cells where these energies are located
-                ja = self.grid.cell(eps_a)
-                jb = self.grid.cell(eps_b)
+                # These things are pre-calculated in Process.set_grid_cache
+                ja = k.ja[i]
+                jb = k.jb[i]
 
                 for j in xrange(ja, jb + 1):
-                    eps1 = max(eps_a, self.benergy[j])
-                    eps2 = min(eps_b, self.benergy[j + 1])
-
-                    if eps1 > eps2:
-                        continue
-
-                    r = t.density * GAMMA * k.int_exp0(g[j], self.cenergy[j],
-                                                       interval=[eps1, eps2])
-                        
+                    r = t.density * GAMMA * k.int_expij(i, j, g[j], 
+                                                         self.cenergy[j])
+                    
                     Q[i, j] += in_factor * r 
                     Q[j, j] -= r
 
 
         return Q.tocsr()
+
+        
+    def rate(self, F0, k, weighted=False):
+        P = np.zeros((self.n))
+        g = self.g(F0)
+
+        for i in xrange(self.n):
+            in_factor = k.in_factor
+
+            # These things are pre-calculated in Process.set_grid_cache
+            ja = k.ja[i]
+            jb = k.jb[i]
+
+            for j in xrange(ja, jb + 1):
+                r = GAMMA * k.int_expij(i, j, g[j], self.cenergy[j])
+                
+                P[j] += r
+
+
+        r = F0.dot(P)
+        if weighted:
+            r *= k.target.density
+
+        return r

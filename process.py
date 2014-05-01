@@ -66,11 +66,6 @@ class Process(object):
         if interval is None:
             interval = [self.x[0], self.x[-1]]
 
-        # inflt = np.logical_and(self.xeps > interval[0], self.xeps < interval[1])
-        # x = np.r_[interval[0], self.xeps[inflt], interval[1]]
-        # sigma = np.r_[[self.interp(interval[0])], self.yeps[inflt], 
-        #               [self.interp(interval[1])]]
-
         inflt = np.logical_and(self.x > interval[0], self.x < interval[1])
         x = np.r_[interval[0], self.x[inflt], interval[1]]
         sigma = np.r_[[self.interp(interval[0])], self.y[inflt], 
@@ -81,6 +76,55 @@ class Process(object):
                                   g, epsj))
 
 
+    def int_expij(self, i, j, g, epsj):
+        """ As int_exp0 but uses the cache of cell intersections. """
+
+        x = self.xij[(i, j)]
+        sigma = self.sigmaij[(i, j)]
+
+        return np.sum(int_linexp0(x[:-1], x[1:], 
+                                  sigma[:-1], sigma[1:], 
+                                  g, epsj))
+
+
+    def set_grid_cache(self, grid):
+        """ Sets a grid cache of the intersections between grid cell j and grid
+        cell i shifted. """
+
+        self.sigmaij = {}
+        self.xij = {}
+        self.ja = np.zeros((grid.n), dtype='i')
+        self.jb = np.zeros((grid.n), dtype='i')
+
+        for i in xrange(grid.n):
+            # This is the the range of energies where a collision
+            # would add a particle to cell i.
+            # The 1e-9 appears in eps_b to make sure that it is contained
+            # in the open interval (0, self.benergy[-1])
+            eps_a = self.shift_factor * grid.b[i] + self.threshold
+            eps_b = min(self.shift_factor * grid.b[i + 1] 
+                        + self.threshold,
+                        grid.b[-1] - 1e-9)
+
+            # And these are the cells where these energies are located
+            self.ja[i] = grid.cell(eps_a)
+            self.jb[i] = grid.cell(eps_b)
+
+            for j in xrange(self.ja[i], self.jb[i] + 1):
+                eps1 = max(eps_a, grid.b[j])
+                eps2 = min(eps_b, grid.b[j + 1])
+                yeps1 = self.interp(eps1)
+                yeps2 = self.interp(eps2)
+
+                inflt = np.logical_and(self.x > eps1, 
+                                       self.x < eps2)
+
+                self.xij[(i, j)] = np.r_[eps1, self.x[inflt], eps2]
+                self.sigmaij[(i, j)] = np.r_[[yeps1], self.y[inflt], [yeps2]]
+
+                
+
+        
 
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
@@ -134,11 +178,23 @@ def int_linexp0(a, b, u0, u1, g, x0):
     # Since u(x) is linear, we calculate separately the coefficients
     # of degree 0 and 1 which, after multiplying by the x in the integrand
     # correspond to 1 and 2
-    A1 = (  np.exp(g * (-a + x0)) * (1 + a * g) 
-          - np.exp(g * (-b + x0)) * (1 + b * g)) / g**2
+    expa = np.exp(g * (-a + x0))
+    expb = np.exp(g * (-b + x0))
 
-    A2 = (np.exp(g * (-a + x0)) * (2 + a * g * (2 + a * g)) - 
-          np.exp(g * (-b + x0)) * (2 + b * g * (2 + b * g))) / g**3
+    ag = a * g
+    bg = b * g
+
+    ag1 = ag + 1
+    bg1 = bg + 1
+
+    g2 = g * g
+    g3 = g2 * g
+
+    A1 = (  expa * ag1
+          - expb * bg1) / g2
+
+    A2 = (expa * (2 * ag1 + ag * ag) - 
+          expb * (2 * bg1 + bg * bg)) / g3
 
     # The factors multiplying each coefficient can be obtained by
     # the interpolation formula of u(x) = c0 + c1 * x
