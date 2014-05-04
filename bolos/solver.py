@@ -23,13 +23,11 @@ from scipy.linalg import inv
 from process import Process
 from target import Target
 
-# For debugging only: remove later
-import pylab
-from IPython import embed
-
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
 TOWNSEND = 1e-21
 
+class ConvergenceError(Exception):
+    pass
 
 class BoltzmannSolver(object):
     def __init__(self, grid):
@@ -74,6 +72,14 @@ class BoltzmannSolver(object):
             self.target[proc.target_name] = target
 
         target.add_process(proc)
+
+    def search(self, signature, product=None, first=True):
+        if product is not None:
+            l = self.target[signature].by_product[product]
+            return l[0] if first else l
+
+        t, p = [x.strip() for x in signature.split('->')]
+        return self.search(t, p, first=first)
 
 
     def iter_elastic(self):
@@ -154,6 +160,7 @@ class BoltzmannSolver(object):
             
         logging.error("Convergence failed")
 
+        raise ConvergenceError()
 
     def linsystem(self, F):
         Q = self.PQ(F)
