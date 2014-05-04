@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 
 import numpy as np
@@ -30,6 +31,8 @@ class Target(object):
                      'EXCITATION': self.excitation,
                      'WEIGHTED_ELASTIC': self.weighted_elastic}
 
+        self.by_product = defaultdict(list)
+
         logging.debug("Target %s created." % str(self))
 
     def add_process(self, process):
@@ -48,6 +51,8 @@ class Target(object):
             self.mass_ratio = process.mass_ratio
 
         process.target = self
+
+        self.by_product[process.product].append(process)
 
         logging.debug("Process %s added to target %s" 
                       % (str(process), str(self)))

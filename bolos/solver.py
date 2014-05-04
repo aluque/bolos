@@ -14,7 +14,7 @@ import numpy as np
 # The scipy.constants contains the recommended CODATA for all physical
 # constants in SI units.
 import scipy.constants as co
-from scipy.integrate import trapz
+from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy import sparse
 from scipy.optimize import fsolve, fmin_l_bfgs_b
@@ -97,6 +97,25 @@ class BoltzmannSolver(object):
             if target.density > 0:
                 for process in target.inelastic:
                     yield target, process
+
+    def iter_growth(self):
+        """ Iterates over all processes that affect the growth
+        of electron density, i.e. ionization and attachment."""
+        for target in self.target.values():
+            if target.density > 0:
+                for process in target.ionization:
+                    yield target, process
+
+                for process in target.attachment:
+                    yield target, process
+
+    def iter_momentum(self):
+        """ Iterates over all processes."""
+        for t, k in self.iter_elastic():
+            yield t, k
+
+        for t, k in self.iter_inelastic():
+            yield t, k
 
 
     def init(self):
@@ -235,13 +254,15 @@ class BoltzmannSolver(object):
         return g
 
 
-    def PQ(self, F0):
+    def PQ(self, F0, reactions=None):
         Q = sparse.dok_matrix((self.n, self.n))
 
         g = self.g(F0)
+        if reactions is None:
+            reactions = list(self.iter_inelastic())
 
         for i in xrange(self.n):
-            for t, k in self.iter_inelastic():
+            for t, k in reactions:
                 in_factor = k.in_factor
 
                 # These things are pre-calculated in Process.set_grid_cache
@@ -281,3 +302,42 @@ class BoltzmannSolver(object):
             r *= k.target.density
 
         return r
+
+
+    ##
+    # Now some functions to calculate transport parameters from the
+    # converged F0
+    def mobility(self, F0):
+        """ Calculates the mobility * N from a converged distribution function.
+        """
+
+        DF0 = np.r_[0.0, np.diff(F0) / np.diff(self.cenergy), 0.0]
+        Q = self.PQ(F0, reactions=self.iter_growth())
+
+        nu = np.sum(Q.dot(F0)) / GAMMA
+        sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy)
+
+        y = DF0 * self.benergy / sigma_tilde
+        y[0] = 0
+
+        return -(GAMMA / 3) * integrate.simps(y, x=self.benergy)
+
+
+    def diffusion(self, F0):
+        """ Calculates the mobility * N from a converged distribution function.
+        """
+
+        Q = self.PQ(F0, reactions=self.iter_growth())
+
+        nu = np.sum(Q.dot(F0)) / GAMMA
+
+        sigma_m = np.zeros_like(self.cenergy)
+        for target, process in self.iter_momentum():
+            s = target.density * process.interp(self.cenergy)
+            sigma_m += s
+
+        sigma_tilde = sigma_m + nu / np.sqrt(self.cenergy)
+
+        y = F0 * self.cenergy / sigma_tilde
+
+        return (GAMMA / 3) * integrate.simps(y, x=self.cenergy)
