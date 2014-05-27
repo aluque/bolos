@@ -12,8 +12,10 @@ Frequently Asked Questions
 Why another Boltzmann solver?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The low-temperature plasma community already has BOLSIG+, a highly optimized, 
-user-friendly solver for the Boltzmann equation.  BOLSIG+ is freely distributed
+The low-temperature plasma community already has 
+`BOLSIG+ <http://www.bolsig.laplace.univ-tlse.fr/>`_, a highly optimized, 
+user-friendly solver for the Boltzmann equation [HP2005]_.  BOLSIG+ is 
+freely distributed
 by its authors, Hagelaar and Pitchford.  Why did I start BOLOS, 
 another Boltzmann solver based on the same algorithms as BOLSIG+?
 
@@ -43,10 +45,11 @@ Why did you use Python?
 Because my main purpose was to develop a simple, readable code in the
 hope that other people would take it and perhaps improve it.
 
-The code relies on the NumPy and SciPy libraries that interface with
+The code relies on the `Numpy <http://www.numpy.org/>`_ and 
+`SciPy <http://www.scipy.org/>`_ libraries that interface with
 highly optimized, C or FORTRAN code.  However, the Python parts are
 unavoidably inefficient and BOLOS is significantly slower that
-BOLSIG+.
+BOLSIG+_.
 
 This difference can be strongly reduced by implementing a couple of
 routines in a lower-level language or in Cython.  However I decided to
@@ -66,7 +69,9 @@ straightforward.
 Can BOLOS read cross-sections in BOLSIG+ format?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Yes!  You can use your cross-sections files from BOLSIG+ or from LxCat
+Yes!  You can use your cross-sections files from 
+`BOLSIG+ <http://www.bolsig.laplace.univ-tlse.fr/>`_ or from 
+`LxCat <http://fr.lxcat.net/>`_
 without changes.  Any problem reading these files will be treated as a
 bug.
 
@@ -105,7 +110,7 @@ calculate reaction rates and the mobility and diffusion coefficients::
       bsolver.target['N2'].density = 0.8
       bsolver.target['O2'].density = 0.2
       bsolver.kT = 300 * co.k / co.eV
-      bsolver.EN = 122.1 * solver.TOWNSEND
+      bsolver.EN = 100 * solver.TOWNSEND
       bsolver.init()
   
       # Start with Maxwell EEDF as initial guess.  Here we are starting with
@@ -149,15 +154,17 @@ If I use BOLOS for my research, which paper should I cite?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 BOLOS follows the algorithm described by Hagelaar and Pitchford so you
-should definitely cite their paper:
-
-*Solving the Boltzmann equation to obtain electron transport
-coefficients and rate coefficients for fluid models*, G. J. M. Hagelaar 
-and L. C. Pitchford, Plasma Sources Sci. Technol. **14** (2005)
-722–733.
+should definitely cite their paper [HP2005]_.
 
 There is not yet any publication associated directly with BOLOS, so if
 you use it please link to its source repository at github.
+
+.. _BOLSIG+: http://www.bolsig.laplace.univ-tlse.fr/
+
+.. [HP2005] *Solving the Boltzmann equation to obtain electron transport
+coefficients and rate coefficients for fluid models*, G. J. M. Hagelaar 
+and L. C. Pitchford, Plasma Sources Sci. Technol. **14** (2005)
+722–733.
 
 
 
