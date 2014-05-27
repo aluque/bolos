@@ -79,7 +79,7 @@ class LogGrid(Grid):
     to avoid log(0) = -inf. The grid is actually logarithmic only for
     x >> s.
     """
-    def __init__(self, x0, x1, n, s=10):
+    def __init__(self, x0, x1, n, s=10.):
         self.s = s
         super(LogGrid, self).__init__(x0, x1, n)
 
