@@ -14,8 +14,7 @@ class Process(object):
                  'ELASTIC': None,
                  'MOMENTUM': None}
 
-    # The shift factor for inelastic collisions. Again, we set it as None for
-    # elastic collisions.
+    # The shift factor for inelastic collisions. 
     SHIFT_FACTOR = {'EXCITATION': 1,
                     'IONIZATION': 2,
                     'ATTACHMENT': 1,
@@ -59,6 +58,8 @@ class Process(object):
             raise ValueError("Negative cross section for %s"
                              % str(self))
        
+        self.cached_grid = None
+
 
     def int_exp0(self, g, epsj, interval=None):
         """ Integrates sigma * eps * exp(g (epsj - eps)) in the given interval.
@@ -90,6 +91,12 @@ class Process(object):
     def set_grid_cache(self, grid):
         """ Sets a grid cache of the intersections between grid cell j and grid
         cell i shifted. """
+
+        if self.cached_grid is grid:
+            # We only have to redo all these computations when the grid changes
+            # so we store the grid for which this has been already calculated.
+            return
+
 
         self.sigmaij = {}
         self.xij = {}
@@ -124,7 +131,8 @@ class Process(object):
 
                 
 
-        
+            self.cached_grid = grid
+
 
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
