@@ -47,6 +47,9 @@ class BoltzmannSolver(object):
         # And these are the deltas
         self.denergy = self.grid.d
 
+        # This is useful when integrating the growth term.
+        self.denergy32 = self.benergy[1:]**1.5 - self.benergy[:-1]**1.5
+
         # A dictionary with target_name -> target
         self.target = {}
         
@@ -76,6 +79,9 @@ class BoltzmannSolver(object):
     def search(self, signature, product=None, first=True):
         if product is not None:
             l = self.target[signature].by_product[product]
+            if not l:
+                raise KeyError("Process %s not found" % signature)
+
             return l[0] if first else l
 
         t, p = [x.strip() for x in signature.split('->')]
@@ -153,17 +159,17 @@ class BoltzmannSolver(object):
                 * kT**(-3./2.) * np.exp(-self.cenergy / kT))
 
 
-    def iterate(self, f0, eps=1e15):
+    def iterate(self, f0, eps=1e14):
         A, Q = self.linsystem(f0)
 
         f1 = sparse.linalg.spsolve(sparse.eye(self.n) + eps * A - eps * Q, f0)
+
         return self.normalized(f1)
 
     
     def converge(self, f0, maxn=100, rtol=1e-5, **kwargs):
         """ Iterates the attempted solution f0 until convergence is reached or
         maxn iterations are consumed.  """
-        from matplotlib import cm
 
         for i in xrange(maxn):
             f1 = self.iterate(f0, **kwargs)
@@ -181,36 +187,41 @@ class BoltzmannSolver(object):
 
         raise ConvergenceError()
 
+
     def linsystem(self, F):
         Q = self.PQ(F)
 
-        if np.any(np.isnan(Q.todense())):
-            raise ValueError("NaN found in Q")
+        # if np.any(np.isnan(Q.todense())):
+        #     raise ValueError("NaN found in Q")
 
-        nu = np.sum(Q.dot(F)) / GAMMA
+        nu = np.sum(Q.dot(F))
 
-        logging.debug("Growth factor nu = %g" % (GAMMA * nu))
-        sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy)
+        sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy) / GAMMA
 
-        A = self.scharf_gummel(sigma_tilde)
-        
-        if np.any(np.isnan(A.todense())):
-            raise ValueError("NaN found in A")
+        # The R (G) term, which we add to A.
+        G = 2 * self.denergy32 * nu / 3
+
+        A = self.scharf_gummel(sigma_tilde, G)
+
+        # if np.any(np.isnan(A.todense())):
+        #     raise ValueError("NaN found in A")
 
         return A, Q
 
 
     def norm(self, f):
-        return np.sum(f * np.sqrt(self.cenergy) * self.denergy)
-
+        return integrate.simps(f * np.sqrt(self.cenergy), x=self.cenergy)
+        
+        # return np.sum(f * np.sqrt(self.cenergy) * self.denergy)
 
     def normalized(self, f):
-        return f / self.norm(f)
+        N = self.norm(f)
+        return f / N
 
 
-    def scharf_gummel(self, sigma_tilde):
+    def scharf_gummel(self, sigma_tilde, G=0):
         D = self.DA / (sigma_tilde) + self.DB
-
+        
         # Due to the zero flux b.c. the values of z[0] and z[-1] are never used.
         # To make sure, we set is a nan so it will taint everything if ever 
         # used.
@@ -240,6 +251,8 @@ class BoltzmannSolver(object):
         # zero flux b.c.
         diags[2, -2] = -a0[-2]
         diags[0, -1] = -a1[-2]
+
+        diags[0, :] += G
 
         A = sparse.dia_matrix((diags, [0, 1, -1]), shape=(self.n, self.n))
 
@@ -285,17 +298,10 @@ class BoltzmannSolver(object):
         g = self.g(F0)
 
         for i in xrange(self.n):
-            in_factor = k.in_factor
-
-            # These things are pre-calculated in Process.set_grid_cache
-            ja = k.ja[i]
-            jb = k.jb[i]
-
-            for j in xrange(ja, jb + 1):
-                r = GAMMA * k.int_expij(i, j, g[j], self.cenergy[j])
-                
-                P[j] += r
-
+            interval = [self.benergy[i], self.benergy[i + 1]]
+            P[i] += GAMMA * k.int_exp0(g[i], self.cenergy[i],
+                                       interval=interval)
+            
 
         r = F0.dot(P)
         if weighted:
