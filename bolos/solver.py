@@ -159,27 +159,49 @@ class BoltzmannSolver(object):
                 * kT**(-3./2.) * np.exp(-self.cenergy / kT))
 
 
-    def iterate(self, f0, eps=1e14):
+    def iterate(self, f0, delta=1e14):
         A, Q = self.linsystem(f0)
 
-        f1 = sparse.linalg.spsolve(sparse.eye(self.n) + eps * A - eps * Q, f0)
+        f1 = sparse.linalg.spsolve(sparse.eye(self.n) 
+                                   + delta * A - delta * Q, f0)
 
         return self.normalized(f1)
 
     
-    def converge(self, f0, maxn=100, rtol=1e-5, **kwargs):
+    def converge(self, f0, maxn=100, rtol=1e-5, delta0=1e14,
+                 full=False, **kwargs):
         """ Iterates the attempted solution f0 until convergence is reached or
         maxn iterations are consumed.  """
 
+        err0 = err1 = 0
+        delta = delta0
+
+        # This is just something that seems to work; can be optimized
+        # to improve convergence.
+        m = 4
+
         for i in xrange(maxn):
-            f1 = self.iterate(f0, **kwargs)
-            err = self.norm(abs(f0 - f1))
+            # If we have already two error estimations we use Richardson
+            # extrapolation to obtain a new delta and speed up convergence.
+            if 0 < err1 < err0:
+                # Linear extrapolation
+                # delta = delta * err1 / (err0 - err1)
+
+                # Log extrapolation attempting to reduce the error a factor m
+                delta = delta * np.log(m) / (np.log(err0) - np.log(err1))
+                
+            f1 = self.iterate(f0, delta=delta, **kwargs)
+            err0 = err1
+            err1 = self.norm(abs(f0 - f1))
             
             logging.debug("After iteration %3d, err = %g (target: %g)" 
-                          % (i + 1, err, rtol))
-            if err < rtol:
+                          % (i + 1, err1, rtol))
+            if err1 < rtol:
                 logging.info("Convergence achieved after %d iterations. "
-                             "err = %g" % (i + 1, err))
+                             "err = %g" % (i + 1, err1))
+                if full:
+                    return f1, i + 1, err1
+
                 return f1
             f0 = f1
             
