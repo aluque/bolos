@@ -295,19 +295,21 @@ class BoltzmannSolver(object):
         if reactions is None:
             reactions = list(self.iter_inelastic())
 
+        data = []
+        rows = []
+        cols = []
+
         for t, k in reactions:
             r = t.density * GAMMA * k.scatterings(g, self.cenergy)
             in_factor = k.in_factor
             
-            Q = sparse.coo_matrix((in_factor * r, (k.i, k.j)),
-                                   shape=(self.n, self.n))
-            P = sparse.coo_matrix((-r, (k.j, k.j)),
-                                  shape=(self.n, self.n))
+            data.extend([in_factor * r, -r])
+            rows.extend([k.i, k.j])
+            cols.extend([k.j, k.j])
 
-
-            PQ = PQ + Q.tocsr() + P.tocsr()
-
-
+        data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
+        PQ = sparse.coo_matrix((data, (rows, cols)),
+                              shape=(self.n, self.n))
         return PQ
 
         
