@@ -15,10 +15,8 @@ import numpy as np
 # constants in SI units.
 import scipy.constants as co
 from scipy import integrate
-from scipy.interpolate import interp1d
 from scipy import sparse
-from scipy.optimize import fsolve, fmin_l_bfgs_b
-from scipy.linalg import inv
+from scipy.sparse.linalg import spsolve
 
 from process import Process
 from target import Target
@@ -163,8 +161,8 @@ class BoltzmannSolver(object):
     def iterate(self, f0, delta=1e14):
         A, Q = self.linsystem(f0)
 
-        f1 = sparse.linalg.spsolve(sparse.eye(self.n) 
-                                   + delta * A - delta * Q, f0)
+        f1 = spsolve(sparse.eye(self.n) 
+                     + delta * A - delta * Q, f0)
 
         return self.normalized(f1)
 
@@ -348,7 +346,7 @@ class BoltzmannSolver(object):
 
 
     def diffusion(self, F0):
-        """ Calculates the mobility * N from a converged distribution function.
+        """ Calculates the diffusion from a converged distribution function.
         """
 
         Q = self.PQ(F0, reactions=self.iter_growth())

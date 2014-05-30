@@ -59,32 +59,6 @@ class Process(object):
         self.cached_grid = None
 
 
-    def int_exp0(self, g, epsj, interval=None):
-        """ Integrates sigma * eps * exp(g (epsj - eps)) in the given interval.
-        See below, int_linexp0 for the shape that we assume for linexp. """
-        if interval is None:
-            interval = [self.x[0], self.x[-1]]
-
-        inflt = np.logical_and(self.x > interval[0], self.x < interval[1])
-        x = np.r_[interval[0], self.x[inflt], interval[1]]
-        sigma = np.r_[[self.interp(interval[0])], self.y[inflt], 
-                      [self.interp(interval[1])]]
-        
-        return np.sum(int_linexp0(x[:-1], x[1:], 
-                                  sigma[:-1], sigma[1:], 
-                                  g, epsj))
-
-
-    def int_expij(self, i, j, g, epsj):
-        """ As int_exp0 but uses the cache of cell intersections. """
-
-        x = self.xij[(i, j)]
-        sigma = self.sigmaij[(i, j)]
-
-        return np.sum(int_linexp0(x[:-1], x[1:], 
-                                  sigma[:-1], sigma[1:], 
-                                  g, epsj))
-
     def scatterings(self, g, eps):
         gj = g[self.j]
         epsj = eps[self.j]
@@ -177,9 +151,6 @@ class NullProcess(Process):
 
         self.x = np.array([])
         self.y = np.array([])
-
-    def int_exp0(self, g, F, interval=None):
-        return 0
 
     def __str__(self):
         return "{NULL}"
