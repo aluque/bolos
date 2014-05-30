@@ -134,6 +134,7 @@ class BoltzmannSolver(object):
             s = target.density * process.interp(self.benergy)
             self.sigma_eps += 2 * target.mass_ratio * s
             self.sigma_m += s
+            process.set_grid_cache(self.grid)
 
         for target, process in self.iter_inelastic():
             self.sigma_m += target.density * process.interp(self.benergy)
@@ -290,41 +291,36 @@ class BoltzmannSolver(object):
 
 
     def PQ(self, F0, reactions=None):
-        Q = sparse.dok_matrix((self.n, self.n))
+        PQ = sparse.csr_matrix((self.n, self.n))
 
         g = self.g(F0)
         if reactions is None:
             reactions = list(self.iter_inelastic())
 
-        for i in xrange(self.n):
-            for t, k in reactions:
-                in_factor = k.in_factor
-
-                # These things are pre-calculated in Process.set_grid_cache
-                ja = k.ja[i]
-                jb = k.jb[i]
-
-                for j in xrange(ja, jb + 1):
-                    r = t.density * GAMMA * k.int_expij(i, j, g[j], 
-                                                         self.cenergy[j])
-                    
-                    Q[i, j] += in_factor * r 
-                    Q[j, j] -= r
+        for t, k in reactions:
+            r = t.density * GAMMA * k.scatterings(g, self.cenergy)
+            in_factor = k.in_factor
+            
+            Q = sparse.coo_matrix((in_factor * r, (k.i, k.j)),
+                                   shape=(self.n, self.n))
+            P = sparse.coo_matrix((-r, (k.j, k.j)),
+                                  shape=(self.n, self.n))
 
 
-        return Q.tocsr()
+            PQ = PQ + Q.tocsr() + P.tocsr()
+
+
+        return PQ
 
         
     def rate(self, F0, k, weighted=False):
-        P = np.zeros((self.n))
         g = self.g(F0)
+        r = k.scatterings(g, self.cenergy)
 
-        for i in xrange(self.n):
-            interval = [self.benergy[i], self.benergy[i + 1]]
-            P[i] += GAMMA * k.int_exp0(g[i], self.cenergy[i],
-                                       interval=interval)
-            
+        P = sparse.coo_matrix((GAMMA * r, (k.j, np.zeros(r.shape))), 
+                              shape=(self.n, 1)).todense()
 
+                              
         r = F0.dot(P)
         if weighted:
             r *= k.target.density

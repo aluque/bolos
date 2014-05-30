@@ -5,26 +5,24 @@ from scipy.interpolate import interp1d
 
 
 class Process(object):
-    # The factor of in-scatering.  It should never be used for elastic
-    # collision, so we set it as None to trigger an exception if it is ever
-    # used.
+    # The factor of in-scatering.  
     IN_FACTOR = {'EXCITATION': 1,
                  'IONIZATION': 2,
                  'ATTACHMENT': 0,
-                 'ELASTIC': None,
-                 'MOMENTUM': None}
+                 'ELASTIC': 1,
+                 'MOMENTUM': 1}
 
     # The shift factor for inelastic collisions. 
     SHIFT_FACTOR = {'EXCITATION': 1,
                     'IONIZATION': 2,
                     'ATTACHMENT': 1,
-                    'ELASTIC': None,
-                    'MOMENTUM': None}
+                    'ELASTIC': 1,
+                    'MOMENTUM': 1}
 
                  
     def __init__(self, target=None, kind=None, data=None,
                  comment='', mass_ratio=None,
-                 product=None, threshold=None, weight_ratio=None):
+                 product=None, threshold=0, weight_ratio=None):
         self.target_name = target
 
         # We will link this later
@@ -87,21 +85,32 @@ class Process(object):
                                   sigma[:-1], sigma[1:], 
                                   g, epsj))
 
+    def scatterings(self, g, eps):
+        gj = g[self.j]
+        epsj = eps[self.j]
+        r = int_linexp0(self.eps[:, 0], self.eps[:, 1], 
+                        self.sigma[:, 0], self.sigma[:, 1],
+                        gj, epsj)
+        return r
 
+        
+        
     def set_grid_cache(self, grid):
         """ Sets a grid cache of the intersections between grid cell j and grid
-        cell i shifted. """
+        cell i shifted. 
+        """
 
+        # We will create an arras with matching 
+        # rows ([i], [j], [eps1, eps2], [sigma1, sigma2])
+        # that contain the overlap between the shifted cell i and cell j.
+        # However we may have more than one row for a given i, j if 
+        # an interpolation point for sigma falls inside the interval.
         if self.cached_grid is grid:
             # We only have to redo all these computations when the grid changes
             # so we store the grid for which this has been already calculated.
             return
 
-
-        self.sigmaij = {}
-        self.xij = {}
-        self.ja = np.zeros((grid.n), dtype='i')
-        self.jb = np.zeros((grid.n), dtype='i')
+        self.i, self.j, self.eps, self.sigma = [], [], [], []
 
         for i in xrange(grid.n):
             # This is the the range of energies where a collision
@@ -114,10 +123,11 @@ class Process(object):
                         grid.b[-1] - 1e-9)
 
             # And these are the cells where these energies are located
-            self.ja[i] = grid.cell(eps_a)
-            self.jb[i] = grid.cell(eps_b)
+            ja = grid.cell(eps_a)
+            jb = grid.cell(eps_b)
 
-            for j in xrange(self.ja[i], self.jb[i] + 1):
+
+            for j in xrange(ja, jb + 1):
                 eps1 = max(eps_a, grid.b[j])
                 eps2 = min(eps_b, grid.b[j + 1])
                 yeps1 = self.interp(eps1)
@@ -125,14 +135,24 @@ class Process(object):
 
                 inflt = np.logical_and(self.x > eps1, 
                                        self.x < eps2)
-
-                self.xij[(i, j)] = np.r_[eps1, self.x[inflt], eps2]
-                self.sigmaij[(i, j)] = np.r_[[yeps1], self.y[inflt], [yeps2]]
-
                 
+                xij = np.r_[eps1, self.x[inflt], eps2]
+                sigmaij = np.r_[[yeps1], self.y[inflt], [yeps2]]
 
-            self.cached_grid = grid
+                for k in xrange(len(xij) - 1):
+                    self.i.append(i)
+                    self.j.append(j)
+                    self.eps.append([xij[k], xij[k + 1]])
+                    self.sigma.append([sigmaij[k], sigmaij[k + 1]])
 
+
+        self.i = np.array(self.i)
+        self.j = np.array(self.j)
+        self.eps = np.array(self.eps)
+        self.sigma = np.array(self.sigma)
+
+        self.cached_grid = grid
+                                
 
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
