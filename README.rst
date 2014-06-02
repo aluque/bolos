@@ -1,7 +1,7 @@
 BOLOS
 =====
 
-``BOLOS`` is a BOLtzmann equation Open Source solver library.  
+``BOLOS`` is a BOLtzmann equation solver Open Source library.  
 
 The code was developed by `Alejandro Luque <http://www.iaa.es/~aluque>`_ at the 
 `Instituto de Astrofísica de Andalucía <http://www.iaa.es>`_ (IAA), `CSIC <http://www.csic.es>`_ and is released under the `LGPLv2 <http://www.gnu.org/licenses/lgpl-2.0.html>`_ license.  
@@ -17,7 +17,7 @@ The low-temperature plasma community already has
 user-friendly solver for the Boltzmann equation [HP2005]_.  BOLSIG+ is 
 freely distributed
 by its authors, Hagelaar and Pitchford.  Why did I start BOLOS, 
-another Boltzmann solver based on the same algorithms as BOLSIG+?
+another Boltzmann solver based on similar algorithms?
 
 The simplest reply is that, as a BOLSIG+ user, I wanted to understand better 
 what goes on beneath BOLSIG+ and the best way to understand something is
@@ -47,14 +47,7 @@ hope that other people would take it and perhaps improve it.
 
 The code relies on the `Numpy <http://www.numpy.org/>`_ and 
 `SciPy <http://www.scipy.org/>`_ libraries that interface with
-highly optimized, C or FORTRAN code.  However, the Python parts are
-unavoidably inefficient and BOLOS is significantly slower that
-BOLSIG+_.
-
-This difference can be strongly reduced by implementing a couple of
-routines in a lower-level language or in Cython.  However I decided to
-leave them in Python to avoid any compilation step in the
-installation.
+highly optimized, C or FORTRAN code.  
 
 
 What version(s) of Python does BOLOS support?
