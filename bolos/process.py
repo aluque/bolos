@@ -72,7 +72,6 @@ class Process(object):
                         self.sigma[:, 0], self.sigma[:, 1],
                         gj, epsj)
         return r
-
         
         
     def set_grid_cache(self, grid):
@@ -85,55 +84,30 @@ class Process(object):
         # that contain the overlap between the shifted cell i and cell j.
         # However we may have more than one row for a given i, j if 
         # an interpolation point for sigma falls inside the interval.
+
         if self.cached_grid is grid:
             # We only have to redo all these computations when the grid changes
             # so we store the grid for which this has been already calculated.
             return
 
-        self.i, self.j, self.eps, self.sigma = [], [], [], []
-
-        for i in xrange(grid.n):
-            # This is the the range of energies where a collision
-            # would add a particle to cell i.
-            # The 1e-9 appears in eps_b to make sure that it is contained
-            # in the open interval (0, self.benergy[-1])
-            eps_a = self.shift_factor * grid.b[i] + self.threshold
-            eps_b = min(self.shift_factor * grid.b[i + 1] 
-                        + self.threshold,
-                        grid.b[-1] - 1e-9)
-
-            # And these are the cells where these energies are located
-            ja = grid.cell(eps_a)
-            jb = grid.cell(eps_b)
-
-
-            for j in xrange(ja, jb + 1):
-                eps1 = max(eps_a, grid.b[j])
-                eps2 = min(eps_b, grid.b[j + 1])
-                yeps1 = self.interp(eps1)
-                yeps2 = self.interp(eps2)
-
-                inflt = np.logical_and(self.x > eps1, 
-                                       self.x < eps2)
-                
-                xij = np.r_[eps1, self.x[inflt], eps2]
-                sigmaij = np.r_[[yeps1], self.y[inflt], [yeps2]]
-
-                for k in xrange(len(xij) - 1):
-                    self.i.append(i)
-                    self.j.append(j)
-                    self.eps.append([xij[k], xij[k + 1]])
-                    self.sigma.append([sigmaij[k], sigmaij[k + 1]])
-
-
-        self.i = np.array(self.i)
-        self.j = np.array(self.j)
-        self.eps = np.array(self.eps)
-        self.sigma = np.array(self.sigma)
-
         self.cached_grid = grid
-                                
 
+        eps1 = self.shift_factor * grid.b + self.threshold
+        eps1[:] = np.minimum(eps1, grid.b[-1] - 1e-9)
+
+        fltb = np.logical_and(grid.b >= eps1[0], grid.b <= eps1[-1])
+        fltx = np.logical_and(self.x >= eps1[0], self.x <= eps1[-1])
+        nodes = np.unique(np.r_[eps1, grid.b[fltb], self.x[fltx]])
+
+        sigma0 = self.interp(nodes)
+
+        self.j = np.searchsorted(grid.b, nodes[1:]) - 1
+        self.i = np.searchsorted(eps1, nodes[1:]) - 1
+        
+        self.sigma = np.c_[sigma0[:-1], sigma0[1:]]
+        self.eps   = np.c_[nodes[:-1], nodes[1:]]
+        
+                
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
                                 "-> " + self.product if self.product else "")
