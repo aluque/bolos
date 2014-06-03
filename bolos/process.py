@@ -60,11 +60,11 @@ class Process(object):
 
 
     def scatterings(self, g, eps):
-        # if len(self.j) == 0:
-        #     # When we do not have inelastic collisions or when the grid is
-        #     # smaller than the thresholds, we still return an empty array
-        #     # and thus avoid exceptions in g[self.j]
-        #     return np.array([], dtype='f')
+        if len(self.j) == 0:
+            # When we do not have inelastic collisions or when the grid is
+            # smaller than the thresholds, we still return an empty array
+            # and thus avoid exceptions in g[self.j]
+            return np.array([], dtype='f')
 
         gj = g[self.j]
         epsj = eps[self.j]
