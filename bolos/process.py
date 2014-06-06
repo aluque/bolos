@@ -10,14 +10,16 @@ class Process(object):
                  'IONIZATION': 2,
                  'ATTACHMENT': 0,
                  'ELASTIC': 1,
-                 'MOMENTUM': 1}
+                 'MOMENTUM': 1,
+                 'EFFECTIVE': 1}
 
     # The shift factor for inelastic collisions. 
     SHIFT_FACTOR = {'EXCITATION': 1,
                     'IONIZATION': 2,
                     'ATTACHMENT': 1,
                     'ELASTIC': 1,
-                    'MOMENTUM': 1}
+                    'MOMENTUM': 1,
+                    'EFFECTIVE': 1}
 
                  
     def __init__(self, target=None, kind=None, data=None,
@@ -30,8 +32,6 @@ class Process(object):
 
         self.kind = kind
         self.data = np.array(data)
-        # Normalize to forget roundoff errors
-        self.data[:] = np.where(np.abs(data) < 1e-35, 0.0, data)
 
         self.x = self.data[:, 0]
         self.y = self.data[:, 1]
@@ -99,15 +99,15 @@ class Process(object):
         fltx = np.logical_and(self.x >= eps1[0], self.x <= eps1[-1])
         nodes = np.unique(np.r_[eps1, grid.b[fltb], self.x[fltx]])
 
+
         sigma0 = self.interp(nodes)
 
         self.j = np.searchsorted(grid.b, nodes[1:]) - 1
         self.i = np.searchsorted(eps1, nodes[1:]) - 1
-        
         self.sigma = np.c_[sigma0[:-1], sigma0[1:]]
         self.eps   = np.c_[nodes[:-1], nodes[1:]]
         
-                
+        
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
                                 "-> " + self.product if self.product else "")
@@ -157,8 +157,17 @@ def int_linexp0(a, b, u0, u1, g, x0):
     # Since u(x) is linear, we calculate separately the coefficients
     # of degree 0 and 1 which, after multiplying by the x in the integrand
     # correspond to 1 and 2
-    expa = np.exp(g * (-a + x0))
-    expb = np.exp(g * (-b + x0))
+
+    # The expressions involve the following exponentials that are problematic:
+    # expa = np.exp(g * (-a + x0))
+    # expb = np.exp(g * (-b + x0))
+    # The problems come with small g: in that case, the exp() rounds to 1
+    # and neglects the order 1 and 2 terms that are required to cancel the
+    # 1/g**2 and 1/g**3 below.  The solution is to rewrite the expressions
+    # as functions of expm1(x) = exp(x) - 1, which is guaranteed to be accurate
+    # even for small x.
+    expm1a = np.expm1(g * (-a + x0))
+    expm1b = np.expm1(g * (-b + x0))
 
     ag = a * g
     bg = b * g
@@ -169,11 +178,18 @@ def int_linexp0(a, b, u0, u1, g, x0):
     g2 = g * g
     g3 = g2 * g
 
-    A1 = (  expa * ag1
-          - expb * bg1) / g2
+    # These are the expressions as functions of expa/expb
+    # A1 = (  expa * ag1
+    #        - expb * bg1) / g2
 
-    A2 = (expa * (2 * ag1 + ag * ag) - 
-          expb * (2 * bg1 + bg * bg)) / g3
+    # A2 = (expa * (2 * ag1 + ag * ag) - 
+    #       expb * (2 * bg1 + bg * bg)) / g3
+
+    A1 = (  expm1a * ag1 + ag
+          - expm1b * bg1 - bg) / g2
+
+    A2 = (expm1a * (2 * ag1 + ag * ag) + ag * (ag + 2) - 
+          expm1b * (2 * bg1 + bg * bg) - bg * (bg + 2)) / g3
 
     # The factors multiplying each coefficient can be obtained by
     # the interpolation formula of u(x) = c0 + c1 * x
