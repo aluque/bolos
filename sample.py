@@ -4,7 +4,7 @@ import argparse
 
 import numpy as np
 import scipy.constants as co
-from bolos import parse, solver, grid
+from bolos import parser, solver, grid
 
 def main():
     parser = argparse.ArgumentParser()
@@ -32,7 +32,7 @@ def main():
     # Parse the cross-section file in BOSIG+ format and load it into the
     # solver.
     with open(args.input) as fp:
-        processes = parse.parse(fp)
+        processes = parser.parse(fp)
     bsolver.load_collisions(processes)
 
     # Set the conditions.  And initialize the solver
