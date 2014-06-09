@@ -37,6 +37,8 @@ from target import Target
 
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
 TOWNSEND = 1e-21
+KB = co.k
+ELECTRONVOLT = co.eV
 
 class ConvergenceError(Exception):
     pass
