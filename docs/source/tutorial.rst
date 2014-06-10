@@ -45,7 +45,7 @@ To start using bolos from your Python, import the required modules::
 Usually you only need to import these three packages: 
 
   * `parser` contains methods to parse a file with cross-sections in 
-    Bolsig+ format, 
+    BOLSIG+ format, 
   * `grid` allows you to define different types of grids in energy space.
   * `solver` contains the :class:`solver.BoltzmannSolver`, which the class that
     you will use to solve the Boltzmann equation.
@@ -193,6 +193,16 @@ instance. (These are the processes that we loaded earlier with
 
   for target, proc in boltzmann.iter_inelastic():
       print "The rate of %s is %g" % (str(proc), boltzmann.rate(f1, proc))
+
+
+Learn more
+^^^^^^^^^^
+BOLOS is an ongoing effort and some of its features are not yet
+properly implemented or documented.  If you want to learn more you can
+go to the `samples/` folder in the github repository.  The code
+contains lots of (hopefully useful) comments, so if you want to
+understand better how to use or extend BOLOS, you should also read
+that.
 
 
 

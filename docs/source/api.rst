@@ -23,21 +23,6 @@ The :mod:`grid` Module
     :undoc-members:
     :show-inheritance:
 
-The :mod:`target` Module
-------------------------
-
-.. automodule:: bolos.target
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-The :mod:`process` Module
--------------------------
-
-.. automodule:: bolos.process
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
 The :mod:`parser` Module
 -------------------------

@@ -1,4 +1,9 @@
-""" Parse BOLSIG+ compatible files with cross-sections. 
+""" This module contains the code required to parse BOLSIG+-compatible files.
+To make the code re-usabe in other projects it is independent from the rest of
+the BOLOS code.
+
+Most user would only use the method :func:`parse` in this module, which is 
+documented below.
     
 """
 
@@ -9,8 +14,27 @@ import logging
 
 
 def parse(fp):
-    """ Parses a BOLSIG+ cross-sections file.  Returns a list of processes where
-    each process is represented by a dictionary with the relevant attributes.
+    """ Parses a BOLSIG+ cross-sections file.  
+
+    Parameters
+    ----------
+    fp : file-like
+       A file object pointing to a Bolsig+-compatible cross-sections file.
+
+    Returns
+    -------
+    processes : list of dictionaries
+       A list with all processes, in dictionary form, included in the file.
+
+    Note
+    ----
+    This function does not return :class:`process.Process` instances so that
+    the parser is independent of the rest of the code and can be re-used in
+    other projects.  If you want to convert a process in dictionary form `d` to
+    a :class:`process.Process` instance, use
+
+    >>> process = process.Process(**d)
+
     """
     processes = []
     for line in fp:
@@ -35,7 +59,7 @@ def parse(fp):
 
 # BOLSIG+'s user guide saye that the separators must consist of at least five dashes
 RE_SEP = re.compile("-----+")
-def read_until_sep(fp):
+def _read_until_sep(fp):
     """ Reads lines from fp until a we find a separator line. """
     lines = []
     for line in fp:
@@ -46,7 +70,7 @@ def read_until_sep(fp):
     return lines
 
 
-def read_block(fp, has_arg=True):
+def _read_block(fp, has_arg=True):
     """ Reads data of a process, contained in a block. 
     has_arg indicates wether we have to read an argument line"""
     target = fp.next().strip()
@@ -55,10 +79,10 @@ def read_block(fp, has_arg=True):
     else:
         arg = None
 
-    comment = "\n".join(read_until_sep(fp))
+    comment = "\n".join(_read_until_sep(fp))
 
     logging.debug("Read process '%s'" % target)
-    data = np.loadtxt(read_until_sep(fp)).tolist()
+    data = np.loadtxt(_read_until_sep(fp)).tolist()
 
     return target, arg, comment, data
 
@@ -66,9 +90,9 @@ def read_block(fp, has_arg=True):
 # Specialized funcion for each keyword. They all return dictionaries with the
 # relevant attibutes.
 # 
-def read_momentum(fp):
+def _read_momentum(fp):
     """ Reads a MOMENTUM or EFFECTIVE block. """
-    target, arg, comment, data = read_block(fp, has_arg=True)
+    target, arg, comment, data = _read_block(fp, has_arg=True)
     mass_ratio = float(arg.split()[0])
     d = dict(target=target,
              mass_ratio=mass_ratio,
@@ -78,9 +102,9 @@ def read_momentum(fp):
     return d
 
 RE_ARROW = re.compile('<?->')    
-def read_excitation(fp):
+def _read_excitation(fp):
     """ Reads an EXCITATION or IONIZATION block. """
-    target, arg, comment, data = read_block(fp, has_arg=True)
+    target, arg, comment, data = _read_block(fp, has_arg=True)
     lhs, rhs = [s.strip() for s in RE_ARROW.split(target)]
 
     d = dict(target=lhs,
@@ -98,9 +122,9 @@ def read_excitation(fp):
     return d
 
 
-def read_attachment(fp):
+def _read_attachment(fp):
     """ Reads an ATTACHMENT block. """
-    target, arg, comment, data = read_block(fp, has_arg=False)
+    target, arg, comment, data = _read_block(fp, has_arg=False)
 
     d = dict(comment=comment,
              data=data,
@@ -116,32 +140,9 @@ def read_attachment(fp):
     return d
 
 
-KEYWORDS = {"MOMENTUM": read_momentum, 
-            "ELASTIC": read_momentum, 
-            "EFFECTIVE": read_momentum,
-            "EXCITATION": read_excitation,
-            "IONIZATION": read_excitation,
-            "ATTACHMENT": read_attachment}
-
-
-
-def main():
-    import json
-    import yaml
-
-    logging.basicConfig(format='[%(asctime)s] %(message)s', 
-                        datefmt='%a, %d %b %Y %H:%M:%S',
-                        level=logging.DEBUG)
-
-    with open(sys.argv[1]) as fp:
-        processes = parse(fp)
-
-    with open("crosssect.json", "w") as fp:
-        fp.write(json.dumps(processes, indent=2))
-
-    with open("crosssect.yaml", "w") as fp:
-        yaml.dump(processes, fp)
-
-
-if __name__ == '__main__':
-    main()
+KEYWORDS = {"MOMENTUM": _read_momentum, 
+            "ELASTIC": _read_momentum, 
+            "EFFECTIVE": _read_momentum,
+            "EXCITATION": _read_excitation,
+            "IONIZATION": _read_excitation,
+            "ATTACHMENT": _read_attachment}
