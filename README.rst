@@ -12,9 +12,7 @@ cross-section input format.
 
 
 The code was developed by `Alejandro Luque <http://www.iaa.es/~aluque>`_ at the 
-`Instituto de Astrofísica de Andalucía <http://www.iaa.es>`_ (IAA), `CSIC <http://www.csic.es>`_ and is released under the `LGPLv2 <>`_ license.  
-
-The code is licensed under the `LGPLv2 License`_. Packages can be 
+`Instituto de Astrofísica de Andalucía <http://www.iaa.es>`_ (IAA), `CSIC <http://www.csic.es>`_ and is licensed under the `LGPLv2 License`_. Packages can be 
 downloaded from the project `homepage`_ on PyPI. The 
 `source code`_ can be obtained from
 GitHub, which also hosts the `bug tracker`_. The `documentation`_  can be
