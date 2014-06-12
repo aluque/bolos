@@ -41,6 +41,18 @@ class Mock(object):
         else:
             return Mock()
  
+    def __mul__(self, other):
+        return Mock()
+
+    def __div__(self, other):
+        return Mock()
+
+    def __rdiv__(self, other):
+        return Mock()
+
+    def __rmul__(self, other):
+        return Mock()
+
 
 MOCK_MODULES = ['numpy', 'scipy', 'scipy.interpolate', 'scipy.constants',
                 'scipy.integrate', 'scipy.sparse', 'scipy.sparse.linalg']
