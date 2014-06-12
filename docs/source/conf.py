@@ -54,7 +54,8 @@ class Mock(object):
         return Mock()
 
 
-MOCK_MODULES = ['numpy', 'scipy', 'scipy.interpolate', 'scipy.constants',
+MOCK_MODULES = ['numpy', 'scipy', 'math',
+                'scipy.interpolate', 'scipy.constants',
                 'scipy.integrate', 'scipy.sparse', 'scipy.sparse.linalg']
 
 for mod_name in MOCK_MODULES:
