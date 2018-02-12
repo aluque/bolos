@@ -82,15 +82,7 @@ use of different grids but probably the growth-renormalization term is
 implemented differently (Hagelaar and Pitchford are not very clear on this 
 point).
 
-Here is a comparison between nitrogen ionization rates in synthetic air as 
-calculated by BOLOS and BOLSIG+:
-
-.. raw:: html
-
-	 <iframe id="igraph" src="https://plot.ly/~aluque/26/bolos-bolsig-line0/" width="700" height="450" seamless="seamless" scrolling="no"></iframe>
-
-
-You can find the complete set of comparisons for synthetic air `here <https://plot.ly/~aluque/1/>`_.
+The code in `samples/bolsig.py` helps to compare the two codes.
 
 
 Feature X is not implemented: what can I do?
