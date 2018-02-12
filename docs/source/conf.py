@@ -20,6 +20,47 @@ import os
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../..'))
 
+class Mock(object):
+
+    __all__ = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return Mock()
+
+    @classmethod
+    def __getattr__(cls, name):
+        if name in ('__file__', '__path__'):
+            return '/dev/null'
+        elif name[0] == name[0].upper():
+            mockType = type(name, (), {})
+            mockType.__module__ = __name__
+            return mockType
+        else:
+            return Mock()
+ 
+    def __mul__(self, other):
+        return Mock()
+
+    def __div__(self, other):
+        return Mock()
+
+    def __rdiv__(self, other):
+        return Mock()
+
+    def __rmul__(self, other):
+        return Mock()
+
+
+MOCK_MODULES = ['numpy', 'scipy', 'math',
+                'scipy.interpolate', 'scipy.constants',
+                'scipy.integrate', 'scipy.sparse', 'scipy.sparse.linalg']
+
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = Mock()
+
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -105,7 +146,11 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'nature'
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if on_rtd:
+    html_theme = 'default'
+else:
+    html_theme = 'nature'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
