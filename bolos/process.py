@@ -93,6 +93,7 @@ class Process(object):
         self.cached_grid = grid
 
         eps1 = self.shift_factor * grid.b + self.threshold
+        eps1[:] = np.maximum(eps1, grid.b[0] + 1e-9)
         eps1[:] = np.minimum(eps1, grid.b[-1] - 1e-9)
 
         fltb = np.logical_and(grid.b >= eps1[0], grid.b <= eps1[-1])
@@ -101,13 +102,12 @@ class Process(object):
 
 
         sigma0 = self.interp(nodes)
-
+        
         self.j = np.searchsorted(grid.b, nodes[1:]) - 1
         self.i = np.searchsorted(eps1, nodes[1:]) - 1
         self.sigma = np.c_[sigma0[:-1], sigma0[1:]]
         self.eps   = np.c_[nodes[:-1], nodes[1:]]
-        
-        
+
     def __str__(self):
         return "{%s: %s %s}" % (self.kind, self.target_name, 
                                 "-> " + self.product if self.product else "")
@@ -141,7 +141,7 @@ def padinterp(data):
     to extrapolate cross-sections. """
     if data[0, 0] > 0:
         x = np.r_[0.0, data[:, 0], 1e8]
-        y = np.r_[0.0, data[:, 1], data[-1, 1]]
+        y = np.r_[data[0, 1], data[:, 1], data[-1, 1]]
     else:
         x = np.r_[data[:, 0], 1e8]
         y = np.r_[data[:, 1], data[-1, 1]]
