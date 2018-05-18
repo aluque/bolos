@@ -129,6 +129,8 @@ class BoltzmannSolver(object):
         
         self.EN = None
 
+        self.FN = 0.
+
         self.grid = grid
 
         # A dictionary with target_name -> target
@@ -429,7 +431,7 @@ class BoltzmannSolver(object):
             process.set_grid_cache(self.grid)
 
         self.W = -GAMMA * self.benergy**2 * self.sigma_eps
-        
+
         # This is the coeff of sigma_tilde
         self.DA = (GAMMA / 3. * self.EN**2 * self.benergy)
 
@@ -605,7 +607,7 @@ class BoltzmannSolver(object):
 
 
     def _scharf_gummel(self, sigma_tilde, G=0):
-        D = self.DA / (sigma_tilde) + self.DB
+        D = self.DA / (sigma_tilde) / (1. + self.FN**2 / (sigma_tilde**2 * GAMMA**2 * self.benergy)) + self.DB
         
         # Due to the zero flux b.c. the values of z[0] and z[-1] are never used.
         # To make sure, we set is a nan so it will taint everything if ever 
@@ -662,6 +664,7 @@ class BoltzmannSolver(object):
         data = []
         rows = []
         cols = []
+
         for t, k in reactions:
             r = t.density * GAMMA * k.scatterings(g, self.cenergy)
             in_factor = k.in_factor
@@ -757,7 +760,7 @@ class BoltzmannSolver(object):
         nu = np.sum(Q.dot(F0)) / GAMMA
         sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy)
 
-        y = DF0 * self.benergy / sigma_tilde
+        y = DF0 * self.benergy / sigma_tilde / (1. + self.FN**2 / (sigma_tilde**2 * GAMMA**2 * self.benergy))
         y[0] = 0
 
         return -(GAMMA / 3) * integrate.simps(y, x=self.benergy)
