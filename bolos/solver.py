@@ -760,7 +760,7 @@ class BoltzmannSolver(object):
         nu = np.sum(Q.dot(F0)) / GAMMA
         sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy)
 
-        y = DF0 * self.benergy / sigma_tilde / (1. + self.FN**2 / (sigma_tilde**2 * GAMMA**2 * self.benergy))
+        y = DF0 * self.benergy / sigma_tilde
         y[0] = 0
 
         return -(GAMMA / 3) * integrate.simps(y, x=self.benergy)
