@@ -731,6 +731,55 @@ class BoltzmannSolver(object):
         return rate
 
 
+    def inverse_rate(self, F0, k, weighted=False):
+        """ Calculates the inverse rate of a process from a (usually converged) EEDF.
+
+        Parameters
+        ----------
+        F0 : array of floats
+           Distribution function.
+        k : :class:`process.Process` or string
+           The process whose rate we want to calculate.  If `k` is a string,
+           it is passed to :func:`search` to obtain a process instance.
+        weighted : boolean, optional
+           If true, the rate is multiplied by the density of the target.
+
+        Returns
+        -------
+        rate : float
+           The rate of the given process according to `F0`.
+
+        Examples
+        --------
+        >>> k_ionization = bsolver.inverse_rate(F0, "N2 -> N2^+")
+
+
+        See Also
+        --------
+        search : Find a process that matches a given signature.
+
+        """
+        g = self._g(F0)
+
+        if isinstance(k, (str, unicode)):
+            k = self.search(k)
+
+        k.set_grid_cache(self.grid)
+
+        r = k.scatterings(g, self.cenergy + k.threshold)
+
+        P = sparse.coo_matrix((GAMMA * r, (k.j, np.zeros(r.shape))),
+                              shape=(self.n, 1)).todense()
+
+        P = np.squeeze(np.array(P))
+
+        rate = F0.dot(P)
+        if weighted:
+            rate *= k.target.density
+
+        return rate
+
+
     def mobility(self, F0):
         """ Calculates the reduced mobility (mobility * N) from the EEDF.
 
@@ -819,4 +868,27 @@ class BoltzmannSolver(object):
 
         de52 = np.diff(self.benergy**2.5)
         return np.sum(0.4 * F0 * de52)
+
+
+    def inelastic_power_loss(self, F0):
+        """ Calculates the total energy loss rate due to
+            inelastic collisions.
+
+        Parameters
+        ----------
+        F0 : array of floats
+           The EEDF used to compute the diffusion coefficient.
+
+        Returns
+        -------
+        reduced power : float
+           The reduced power of energy loss. (eV m^3/s)
+        """
+        PN = 0
+        for t, k in self.iter_inelastic():
+            fraction = 1.0 / (1.0 + np.exp(-k.threshold / self.kT))
+            PN += fraction * k.threshold * self.rate(F0, k, weighted=True)
+            PN -= (1.0 - fraction) * k.threshold * self.inverse_rate(F0, k, weighted=True)
+
+        return PN
 
