@@ -84,8 +84,9 @@ def main():
     f1 = bsolver.converge(f1, maxn=200, rtol=1e-5)
 
     # Search for a particular process in the solver and print its rate.
-    #k = bsolver.search('N2 -> N2^+')
-    #print "THE REACTION RATE OF %s IS %g\n" % (k, bsolver.rate(f1, k))
+    k = bsolver.search('N2 -> N2^+')
+    print "THE REACTION RATE OF %s IS %g\n" % (k, bsolver.rate(f1, k))
+    print "THE INVERSE REACTION RATE OF %s IS %g\n" % (k, bsolver.inverse_rate(f1, k))
     
     # You can also iterate over all processes or over processes of a certain
     # type.
@@ -98,6 +99,8 @@ def main():
     print "mobility * N   = %.3e  1/m/V/s" % bsolver.mobility(f1)
     print "diffusion * N  = %.3e  1/m/s" % bsolver.diffusion(f1)
     print "average energy = %.3e  eV" % bsolver.mean_energy(f1)
+    print "inelastic heating / N = %.3e  eV m^3/s" % bsolver.inelastic_power_loss(f1)
+    print "ohmic heating / N = %.3e  eV m^3/s" % (bsolver.mobility(f1) * bsolver.EN * bsolver.EN)
 
     import pylab
     pylab.plot(bsolver.grid.c, f1)
