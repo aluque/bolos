@@ -1,9 +1,12 @@
+from __future__ import absolute_import
+from builtins import str
+from builtins import object
 from collections import defaultdict
 import logging
 
 import numpy as np
 
-from process import Process, NullProcess
+from .process import Process, NullProcess
 
 
 class Target(object):

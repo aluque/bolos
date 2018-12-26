@@ -14,7 +14,10 @@ iteratively with :func:`BoltzmannSolver.converge`.  Finally, methods such as
 to obtain reaction rates and transport parameters for a given EEDF.
 
 """
+from __future__ import absolute_import
 
+from builtins import range
+from builtins import object
 __docformat__ = "restructuredtext en"
 
 import sys
@@ -32,8 +35,8 @@ from scipy import integrate
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
-from process import Process
-from target import Target
+from .process import Process
+from .target import Target
 
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
 TOWNSEND = 1e-21
@@ -215,7 +218,7 @@ class BoltzmannSolver(object):
 
         # We make sure that all targets have their elastic cross-sections
         # in the form of ELASTIC cross sections (not EFFECTIVE / MOMENTUM)
-        for key, item in self.target.iteritems():
+        for key, item in self.target.items():
             item.ensure_elastic()
             
         return plist
@@ -328,7 +331,7 @@ class BoltzmannSolver(object):
         An iterator over (target, process) tuples. 
         """
 
-        for target in self.target.values():
+        for target in list(self.target.values()):
             if target.density > 0:
                 for process in target.elastic:
                     yield target, process
@@ -344,7 +347,7 @@ class BoltzmannSolver(object):
         -------
         An iterator over (target, process) tuples. """
 
-        for target in self.target.values():
+        for target in list(self.target.values()):
             if target.density > 0:
                 for process in target.inelastic:
                     yield target, process
@@ -362,7 +365,7 @@ class BoltzmannSolver(object):
         An iterator over (target, process) tuples. 
 
         """
-        for target in self.target.values():
+        for target in list(self.target.values()):
             if target.density > 0:
                 for process in target.ionization:
                     yield target, process
@@ -542,7 +545,7 @@ class BoltzmannSolver(object):
         err0 = err1 = 0
         delta = delta0
 
-        for i in xrange(maxn):
+        for i in range(maxn):
             # If we have already two error estimations we use Richardson
             # extrapolation to obtain a new delta and speed up convergence.
             if 0 < err1 < err0:
@@ -709,7 +712,7 @@ class BoltzmannSolver(object):
         """
         g = self._g(F0)
 
-        if isinstance(k, (str, unicode)):
+        if isinstance(k, str):
             k = self.search(k)
 
         k.set_grid_cache(self.grid)
