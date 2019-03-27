@@ -3,7 +3,7 @@ import logging
 
 import numpy as np
 
-from process import Process, NullProcess
+from .process import Process, NullProcess
 
 
 class Target(object):

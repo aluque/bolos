@@ -32,8 +32,8 @@ from scipy import integrate
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
-from process import Process
-from target import Target
+from .process import Process
+from .target import Target
 
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
 TOWNSEND = 1e-21
@@ -217,7 +217,7 @@ class BoltzmannSolver(object):
 
         # We make sure that all targets have their elastic cross-sections
         # in the form of ELASTIC cross sections (not EFFECTIVE / MOMENTUM)
-        for key, item in self.target.iteritems():
+        for key, item in self.target.items():
             item.ensure_elastic()
 
         return plist
