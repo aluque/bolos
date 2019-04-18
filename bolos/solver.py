@@ -544,7 +544,7 @@ class BoltzmannSolver(object):
         err0 = err1 = 0
         delta = delta0
 
-        for i in xrange(maxn):
+        for i in range(maxn):
             # If we have already two error estimations we use Richardson
             # extrapolation to obtain a new delta and speed up convergence.
             if 0 < err1 < err0:
