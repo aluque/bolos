@@ -712,7 +712,7 @@ class BoltzmannSolver(object):
         """
         g = self._g(F0)
 
-        if isinstance(k, (str, unicode)):
+        if isinstance(k, str):
             k = self.search(k)
 
         k.set_grid_cache(self.grid)
