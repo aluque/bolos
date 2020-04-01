@@ -1,0 +1,19 @@
+Metadata-Version: 1.1
+Name: bolos
+Version: 0.1
+Summary: A library to solve the Boltzmann equation
+Home-page: https://github.com/lionelchg/bolos
+Author: Lionel Cheng
+Author-email: cheng@cerfacs.fr
+License: LGPLv2
+Description: UNKNOWN
+Keywords: physics plasma boltzmann
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Physics
+Classifier: Topic :: Scientific/Engineering :: Atmospheric Science
+Classifier: License :: OSI Approved :: GNU Lesser General Public License v2 (LGPLv2)
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
