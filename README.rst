@@ -13,10 +13,10 @@ cross-section input format.
 
 The code was developed by `Alejandro Luque <http://www.iaa.es/~aluque>`_ at the 
 `Instituto de Astrofísica de Andalucía <http://www.iaa.es>`_ (IAA), `CSIC <http://www.csic.es>`_ and is licensed under the `LGPLv2 License`_. Packages can be 
-downloaded from the project `homepage`_ on PyPI. This is a development made by `Lionel Cheng <https://www.linkedin.com/in/lionel-cheng-909948105>`_ from 'CERFACS <http://www.cerfacs.fr>'_, a PhD student working in plasma assisted combustion. The 
+downloaded from the project `homepage`_ on PyPI. This is a development made by `Lionel Cheng <https://www.linkedin.com/in/lionel-cheng-909948105>`_ from `CERFACS <http://www.cerfacs.fr>`_, a PhD student working in plasma assisted combustion. The 
 `source code`_ can be obtained from
 GitHub, which also hosts the `bug tracker`_. The `documentation`_  can be
-read on a pdf file in the docs.
+read on ReadTheDocs.
 
 
 .. _LGPLv2 License: http://www.gnu.org/licenses/lgpl-2.0.html
