@@ -585,6 +585,8 @@ class BoltzmannSolver(object):
 
 
     def _linsystem(self, F):
+        """ Constructs the matrix and the right hand side of the linear system depending on the growth model
+        growth_model == 0 (None), 1 (Temporal), 2 (Spatial) """
         Q = self._PQ(F)
 
         # Useful for debugging but wasteful in normal times.
@@ -730,6 +732,8 @@ class BoltzmannSolver(object):
         return PQ
 
     def _coulomb(self, F0):
+        """ Calculates the coulomb collisions terms as done in the original 2005 paper.
+        The calculation is rather costly as it involves three integral calculations """
         kTe = 2. / 3. * co.e * integrate.simps(self.cenergy**1.5 * F0, self.cenergy)
         A1_f = np.sqrt(self.cenergy) * F0
         A1 = np.array([integrate.simps(A1_f[:i+1], 
