@@ -136,6 +136,12 @@ class BoltzmannSolver(object):
 
         # A dictionary with target_name -> target
         self.target = {}
+
+        # Default temporal growth model
+        self.growth_model = 1
+
+        # Default coulomb cross sections not taken into account
+        self.coulomb = False
         
     def _get_grid(self):
         return self._grid
@@ -152,8 +158,11 @@ class BoltzmannSolver(object):
         # And these are the deltas
         self.denergy = self.grid.d
 
-        # This is useful when integrating the growth term.
+        # This is useful when integrating the temporal growth term.
         self.denergy32 = self.benergy[1:]**1.5 - self.benergy[:-1]**1.5
+
+        # This is useful when integrating the spatial growth term.
+        self.denergy2 = self.benergy[1:]**2 - self.benergy[:-1]**2
 
         self.n = grid.n
 
@@ -220,7 +229,7 @@ class BoltzmannSolver(object):
         # in the form of ELASTIC cross sections (not EFFECTIVE / MOMENTUM)
         for key, item in self.target.items():
             item.ensure_elastic()
-            
+
         return plist
 
     def add_process(self, **kwargs):
@@ -584,12 +593,37 @@ class BoltzmannSolver(object):
 
         nu = np.sum(Q.dot(F))
 
-        sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy) / GAMMA
+        if (self.growth_model==0):
+            A = self._scharf_gummel(self.sigma_m)
 
-        # The R (G) term, which we add to A.
-        G = 2 * self.denergy32 * nu / 3
+        elif (self.growth_model==1):
+            sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy) / GAMMA
 
-        A = self._scharf_gummel(sigma_tilde, G)
+            # The R (G) term, which we add to A.
+            G = 2 * self.denergy32 * nu / 3
+
+            if (self.coulomb): self._coulomb(F)
+
+            A = self._scharf_gummel(sigma_tilde, G)
+
+        elif (self.growth_model==2):
+            dF = np.r_[0, np.diff(F) / np.diff(self.cenergy), 0]
+
+            sigma_m_c = 0.5 * (self.sigma_m[:-1] + self.sigma_m[1:])
+
+            mu = - GAMMA / 3 * ( integrate.simps(self.benergy*dF/self.sigma_m, x=self.benergy) ) 
+            D = GAMMA / 3 * ( integrate.simps(self.cenergy*F/sigma_m_c, x=self.cenergy) ) 
+            alpha = (mu*self.EN - np.sqrt((mu*self.EN)**2 - 4*D*nu)) / 2 / D
+
+            G = - alpha * GAMMA / 3 * (alpha * (self.benergy[1:]**2 -
+                self.benergy[:-1]**2) / sigma_m_c / 2 -
+                self.EN * (self.benergy[1:]/self.sigma_m[1:] - self.benergy[:-1]/self.sigma_m[:-1]))
+
+            self.WS = - 2 / 3 * GAMMA * alpha * self.EN * self.benergy / self.sigma_m
+
+            if (self.coulomb): self._coulomb(F)
+
+            A = self._scharf_gummel(self.sigma_m, G)
 
         # if np.any(np.isnan(A.todense())):
         #     raise ValueError("NaN found in A")
@@ -615,10 +649,26 @@ class BoltzmannSolver(object):
         # used.
         # TODO: Perhaps it would be easier simply to set the appropriate
         # values here to satisfy the b.c.
-        z  = self.W * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
-
-        a0 = self.W / (1 - np.exp(-z))
-        a1 = self.W / (1 - np.exp(z))
+        if self.growth_model<=1:
+            if self.coulomb:
+                D += self.DC
+                z  = (self.W + self.WC) * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = (self.W + self.WC) / (1 - np.exp(-z))
+                a1 = (self.W + self.WC) / (1 - np.exp(z))
+            else:
+                z  = self.W * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = self.W / (1 - np.exp(-z))
+                a1 = self.W / (1 - np.exp(z))
+        elif self.growth_model==2:
+            if self.coulomb:
+                D += self.DC
+                z  = (self.W + self.WC + self.WS) * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = (self.W + self.WC + self.WS) / (1 - np.exp(-z))
+                a1 = (self.W + self.WC + self.WS) / (1 - np.exp(z))
+            else:
+                z  = (self.W + self.WS) * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = (self.W + self.WS) / (1 - np.exp(-z))
+                a1 = (self.W + self.WS) / (1 - np.exp(z))
 
         diags = np.zeros((3, self.n))
 
@@ -629,7 +679,7 @@ class BoltzmannSolver(object):
         diags[1, :]  =  a1[:-1]
         diags[2, :]  = -a0[1:]
 
-        # F[n+1] = 2 * F[n] + F[n-1] b.c.
+        # F[n+1] = 2 * F[n] - F[n-1] b.c.
         # diags[2, -2] -= a1[-1]
         # diags[0, -1] += 2 * a1[-1]
 
@@ -678,6 +728,28 @@ class BoltzmannSolver(object):
                               shape=(self.n, self.n))
 
         return PQ
+
+    def _coulomb(self, F0):
+        kTe = 2. / 3. * co.e * integrate.simps(self.cenergy**1.5 * F0, self.cenergy)
+        A1_f = np.sqrt(self.cenergy) * F0
+        A1 = np.array([integrate.simps(A1_f[:i+1], 
+                        self.cenergy[:i+1]) for i in range(self.n)])
+        A2_f = self.cenergy**1.5 * F0
+        A2 = np.array([integrate.simps(A2_f[:i+1],
+                        self.cenergy[:i+1]) for i in range(self.n)])
+        A3 = np.array([integrate.simps(F0[i:],
+                        self.cenergy[i:]) for i in range(self.n)])
+
+        coulomb_param = (12. * np.pi * (co.epsilon_0 * kTe)**1.5 /
+                            co.e**3 / np.sqrt(self.electron_density))
+        a = co.e**2 * GAMMA / 24. / np.pi / co.epsilon_0**2 * np.log(coulomb_param)
+
+        A1 = np.r_[A1[0], 0.5 * (A1[:-1] + A1[1:]), A1[-1]]
+        A2 = np.r_[A2[0], 0.5 * (A2[:-1] + A2[1:]), A2[-1]]
+        A3 = np.r_[A3[0], 0.5 * (A3[:-1] + A3[1:]), A3[-1]]
+
+        self.WC = - 3. * a * self.ion_degree * A1
+        self.DC = 2. * a * self.ion_degree * (A2 + self.benergy**1.5*A3)
 
     ##
     # Now some functions to calculate rates transport parameters from the

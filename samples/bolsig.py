@@ -47,7 +47,7 @@ def main():
 
     
     # Use a linear grid from 0 to 60 eV with 100 intervals.
-    gr = grid.LinearGrid(0, 80., 400)
+    gr = grid.LinearGrid(0.001, 80., 400)
 
     # Initiate the solver instance
     bsolver = solver.BoltzmannSolver(gr)

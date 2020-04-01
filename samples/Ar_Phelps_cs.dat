@@ -1,0 +1,228 @@
+LXCat, www.lxcat.net
+Generated on 29 Jan 2020. All rights reserved.
+
+RECOMMENDED REFERENCE FORMAT
+- Phelps database, www.lxcat.net, retrieved on January 29, 2020.
+Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
+Please check below in the headers of databases.
+
+CROSS SECTION DATA FORMAT
+In downloaded files, each collision process is defined by a block consisting of
+1st line
+Keyword in capitals indicating the type of the collision. Possible collision types are elastic, effective, excitation,
+ionization, or attachment (capital letters required, key words are case sensitive), where "elastic" is used to denote
+the elastic momentum transfer cross section and where "effective" denotes the total momentum transfer cross section (sum
+of elastic momentum transfer and total inelastic cross sections).  The latter is useful for solving the Boltzmann
+equation in the 2-term approximation.
+2nd line
+Name of the target particle species. This name is a character string, freely chosen by the user, e.g. "Ar". Optionally
+for excitation processes, the name of the corresponding excited state can be specified on the same line, separated from
+the first name either by arrow "->" (dash + greater than) or by double-head arrow "<->" (less than + dash +
+greater than), e.g. "Ar -> Ar*" and "Ar <-> Ar*", respectively. In the later case BOLSIG+ will automatically
+define the inverse superelastic process, constructing the superelastic cross-section by detailed balancing, and
+considering the indicated excited state as the target. In this case, the ratio of statistical weights must be input in
+the 3rd line (see below).
+3rd line
+For elastic and effective collisions, the ratio of the electron mass to the target particle mass. For excitation or
+ionization collisions, the electron energy loss (nominally the threshold energy) in eV. For attachment, the 3rd line is
+missing. In case of an excitation process where an excited state has been indicated on the 2nd line using double-head
+arrow "<->", the 3rd line must specify also ratio of the statistical weights of the final state to the initial state
+as the second parameter in 3rd line this is needed by BOLSIG+ to calculate the de-excitation cross-section. The
+statistical weight ratio, if given, will also be used by the automatic superelastics option in BOLSIG+. If this ratio is
+not provided then BOLSIG+ will assume it unity.
+from 4th line (optionally)
+User comments and reference information, maximum 100 lines. The only constraint on format is that these comment lines
+must not start with a number.
+Finally
+Table of the cross section as a function of energy. The table starts and ends by a line of dashes "------" (at least 5),
+and has otherwise two numbers per line: the energy in eV and the cross section in m2.
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE:         Phelps database
+PERMLINK:         www.lxcat.net/Phelps
+DESCRIPTION:      A compilation of atomic and molecular data, assembled and evaluated by A.V. Phelps and collaborators.
+                  Please refer to these data using the sources cited for each gas. 
+                  
+                  We make no claims for these cross sections beyond those stated in the papers where they are published
+                  or cited.  In most cases these cross sections were assembled in the 1970's and 1980's. In only a few
+                  cases have they been modified or tested since that time. I do not plan any updates.  Additions have
+                  been made when cross sections have been assembled for other purposes. Since the JILA information
+                  center was closed by NIST, there is no one there to help you.  Opinions expressed are those of AV
+                  Phelps and do not imply JILA, CU, or NIST approval.
+CONTACT:          A.V. Phelps, Fellow Adjoint of JILA
+                  University of Colorado
+                  Boulder, CO 80309-0440
+                  e-mail: avp@@jila.colorado.edu
+HOW TO REFERENCE: http://jilawww.colorado.edu/~avp/
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+************************************************************************************************************************
+
+COMMENT: Yamabe, Buckman, and Phelps, Phys. Rev. 27, 1345 (1983). 
+         Revised Oct 1997.
+
+********************************************************** Ar **********************************************************
+
+EFFECTIVE
+Ar
+ 1.360000e-5
+SPECIES: e / Ar
+PROCESS: E + Ar -> E + Ar, Effective
+PARAM.:  m/M = 0.0000136, complete set
+COMMENT: EFFECTIVE Momentum transfer CROSS SECTION.
+UPDATED: 2011-06-06 18:19:56
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 0.000000e+0	7.500000e-20
+ 1.000000e-3	7.500000e-20
+ 2.000000e-3	7.100000e-20
+ 3.000000e-3	6.700000e-20
+ 5.000000e-3	6.100000e-20
+ 7.000000e-3	5.400000e-20
+ 8.500000e-3	5.050000e-20
+ 1.000000e-2	4.600000e-20
+ 1.500000e-2	3.750000e-20
+ 2.000000e-2	3.250000e-20
+ 3.000000e-2	2.500000e-20
+ 4.000000e-2	2.050000e-20
+ 5.000000e-2	1.730000e-20
+ 7.000000e-2	1.130000e-20
+ 1.000000e-1	5.900000e-21
+ 1.200000e-1	4.000000e-21
+ 1.500000e-1	2.300000e-21
+ 1.700000e-1	1.600000e-21
+ 2.000000e-1	1.030000e-21
+ 2.500000e-1	9.100000e-22
+ 3.000000e-1	1.530000e-21
+ 3.500000e-1	2.350000e-21
+ 4.000000e-1	3.300000e-21
+ 5.000000e-1	5.100000e-21
+ 7.000000e-1	8.600000e-21
+ 1.000000e+0	1.380000e-20
+ 1.200000e+0	1.660000e-20
+ 1.300000e+0	1.820000e-20
+ 1.500000e+0	2.100000e-20
+ 1.700000e+0	2.300000e-20
+ 1.900000e+0	2.500000e-20
+ 2.100000e+0	2.800000e-20
+ 2.200000e+0	2.900000e-20
+ 2.500000e+0	3.300000e-20
+ 2.800000e+0	3.800000e-20
+ 3.000000e+0	4.100000e-20
+ 3.300000e+0	4.500000e-20
+ 3.600000e+0	4.900000e-20
+ 4.000000e+0	5.400000e-20
+ 4.500000e+0	6.100000e-20
+ 5.000000e+0	6.700000e-20
+ 6.000000e+0	8.100000e-20
+ 7.000000e+0	9.600000e-20
+ 8.000000e+0	1.170000e-19
+ 1.000000e+1	1.500000e-19
+ 1.200000e+1	1.520000e-19
+ 1.500000e+1	1.410000e-19
+ 1.700000e+1	1.310000e-19
+ 2.000000e+1	1.100000e-19
+ 2.500000e+1	9.450000e-20
+ 3.000000e+1	8.740000e-20
+ 5.000000e+1	6.900000e-20
+ 7.500000e+1	5.850000e-20
+ 1.000000e+2	5.250000e-20
+ 1.500000e+2	4.240000e-20
+ 2.000000e+2	3.760000e-20
+ 3.000000e+2	3.020000e-20
+ 5.000000e+2	2.100000e-20
+ 7.000000e+2	1.640000e-20
+ 1.000000e+3	1.210000e-20
+ 1.500000e+3	8.800000e-21
+ 2.000000e+3	6.600000e-21
+ 3.000000e+3	4.500000e-21
+ 5.000000e+3	3.100000e-21
+ 7.000000e+3	2.300000e-21
+ 1.000000e+4	1.750000e-21
+-----------------------------
+
+EXCITATION
+Ar -> Ar*(11.5eV)
+ 1.150000e+1
+SPECIES: e / Ar
+PROCESS: E + Ar -> E + Ar*(11.5eV), Excitation
+PARAM.:  E = 11.5 eV, complete set
+COMMENT: TOTAL Excitation LOW E SCHAPERT-SCHEIBNER, HI E UNKNOWN.
+UPDATED: 2010-10-01 14:49:42
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 1.150000e+1	0.000000e+0
+ 1.270000e+1	7.000000e-22
+ 1.370000e+1	1.410000e-21
+ 1.470000e+1	2.280000e-21
+ 1.590000e+1	3.800000e-21
+ 1.650000e+1	4.800000e-21
+ 1.750000e+1	6.100000e-21
+ 1.850000e+1	7.500000e-21
+ 1.990000e+1	9.200000e-21
+ 2.220000e+1	1.170000e-20
+ 2.470000e+1	1.330000e-20
+ 2.700000e+1	1.420000e-20
+ 3.000000e+1	1.440000e-20
+ 3.300000e+1	1.410000e-20
+ 3.530000e+1	1.340000e-20
+ 4.200000e+1	1.250000e-20
+ 4.800000e+1	1.160000e-20
+ 5.200000e+1	1.110000e-20
+ 7.000000e+1	9.400000e-21
+ 1.000000e+2	7.600000e-21
+ 1.500000e+2	6.000000e-21
+ 2.000000e+2	5.050000e-21
+ 3.000000e+2	3.950000e-21
+ 5.000000e+2	2.800000e-21
+ 7.000000e+2	2.250000e-21
+ 1.000000e+3	1.770000e-21
+ 1.500000e+3	1.360000e-21
+ 2.000000e+3	1.100000e-21
+ 3.000000e+3	8.300000e-22
+ 5.000000e+3	5.800000e-22
+ 7.000000e+3	4.500000e-22
+ 1.000000e+4	3.500000e-22
+-----------------------------
+
+IONIZATION
+Ar -> Ar^+
+ 1.580000e+1
+SPECIES: e / Ar
+PROCESS: E + Ar -> E + E + Ar+, Ionization
+PARAM.:  E = 15.8 eV, complete set
+COMMENT: Ionization - RAPP-SCHRAM.
+UPDATED: 2010-10-01 14:49:50
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+ 1.580000e+1	0.000000e+0
+ 1.600000e+1	2.020000e-22
+ 1.700000e+1	1.340000e-21
+ 1.800000e+1	2.940000e-21
+ 2.000000e+1	6.300000e-21
+ 2.200000e+1	9.300000e-21
+ 2.375000e+1	1.150000e-20
+ 2.500000e+1	1.300000e-20
+ 2.650000e+1	1.450000e-20
+ 3.000000e+1	1.800000e-20
+ 3.250000e+1	1.990000e-20
+ 3.500000e+1	2.170000e-20
+ 3.750000e+1	2.310000e-20
+ 4.000000e+1	2.390000e-20
+ 5.000000e+1	2.530000e-20
+ 5.500000e+1	2.600000e-20
+ 1.000000e+2	2.850000e-20
+ 1.500000e+2	2.520000e-20
+ 2.000000e+2	2.390000e-20
+ 3.000000e+2	2.000000e-20
+ 5.000000e+2	1.450000e-20
+ 7.000000e+2	1.150000e-20
+ 1.000000e+3	8.600000e-21
+ 1.500000e+3	6.400000e-21
+ 2.000000e+3	5.200000e-21
+ 3.000000e+3	3.600000e-21
+ 5.000000e+3	2.400000e-21
+ 7.000000e+3	1.800000e-21
+ 1.000000e+4	1.350000e-21
+-----------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
