@@ -16,8 +16,7 @@ def main():
 
     data = dict()
 
-    data['electron'] = "MaxwellBoltzmann"
-    data['cross_section'] = processes
+    data['cross-sections'] = processes
 
     outfile = open("lxcat.yaml", "w")
     yaml.dump(data, outfile)
