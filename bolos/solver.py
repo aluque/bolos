@@ -836,3 +836,35 @@ class BoltzmannSolver(object):
 
         """
         return 2./3. * self.mean_energy(F0) * ELECTRONVOLT / KB
+
+
+    def normalized_inelastic_energy_loss(self, F0, target_name=None):
+        energy = 0.0
+        if target_name is None:
+            for target, process in self.iter_inelastic():
+                energy += process.threshold * self.rate(F0, process, weighted=True)
+        else:
+            for target, process in self.iter_inelastic():
+                if process.target_name == target_name:
+                    energy += process.threshold * self.rate(F0, process)
+        return energy
+
+
+    def normalized_elastic_energy_loss(self, F0):
+        energy = 0.0
+        DF0 = np.r_[0.0, np.diff(F0) / np.diff(self.cenergy), 0.0]
+        for target, process in self.iter_elastic():
+            y1 = process.interp(self.cenergy) * self.cenergy * self.cenergy * F0
+            y2 = self.kT * DF0 * self.benergy
+            energy += target.density * 2 * target.mass_ratio * (
+                      integrate.simps(y1, x=self.cenergy) +
+                      integrate.simps(y2, x=self.benergy))
+        return GAMMA * energy
+
+
+    def normalized_total_energy_loss(self, F0):
+        return normalized_elastic_energy_loss(F0) + normalized_inelastic_energy_loss(F0)
+
+
+    def normalized_total_power(self, F0):
+        return self.mobility(F0) * self.EN * self.EN
