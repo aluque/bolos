@@ -855,7 +855,7 @@ class BoltzmannSolver(object):
         DF0 = np.r_[0.0, np.diff(F0) / np.diff(self.cenergy), 0.0]
         for target, process in self.iter_elastic():
             y1 = process.interp(self.cenergy) * self.cenergy * self.cenergy * F0
-            y2 = self.kT * DF0 * self.benergy
+            y2 = process.interp(self.benergy) * self.kT * DF0
             energy += target.density * 2 * target.mass_ratio * (
                       integrate.simps(y1, x=self.cenergy) +
                       integrate.simps(y2, x=self.benergy))
