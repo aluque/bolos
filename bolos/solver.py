@@ -863,7 +863,7 @@ class BoltzmannSolver(object):
 
 
     def normalized_total_energy_loss(self, F0):
-        return normalized_elastic_energy_loss(F0) + normalized_inelastic_energy_loss(F0)
+        return self.normalized_elastic_energy_loss(F0) + self.normalized_inelastic_energy_loss(F0)
 
 
     def normalized_total_power(self, F0):
