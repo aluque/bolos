@@ -11,14 +11,17 @@ def main():
 
     # Parse the cross-section file in BOSIG+ format and load it into the
     # solver.
-    with open("Cross section.txt") as fp:
+    with open("itikawa-2009-O2.txt") as fp:
         processes = parser.parse(fp)
 
     data = dict()
 
-    data['cross-sections'] = processes
+    for cs in processes:
+        cs["kind"] = cs["kind"].lower()
 
-    outfile = open("lxcat.yaml", "w")
+    data['cross_section'] = processes
+
+    outfile = open("oxygen_cross_sections.yaml", "w")
     yaml.dump(data, outfile)
 
 if __name__ == '__main__':
