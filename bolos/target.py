@@ -3,7 +3,7 @@ import logging
 
 import numpy as np
 
-from process import Process, NullProcess
+from .process import Process, NullProcess
 
 
 class Target(object):
@@ -84,10 +84,10 @@ class Target(object):
             newdata[:, 1] -= p.interp(newdata[:, 0])
 
         if np.amin(newdata[:, 1]) < 0:
-            logging.warning('After substracting INELASTIC from EFFECTIVE, '
-                            'target %s has negative cross-section.'
-                            % self.name)
-            logging.warning('Setting as max(0, ...)')
+            # logging.warning('After substracting INELASTIC from EFFECTIVE, '
+            #                 'target %s has negative cross-section.'
+            #                 % self.name)
+            # logging.warning('Setting as max(0, ...)')
             newdata[:, 1] = np.where(newdata[:, 1] > 0, newdata[:, 1], 0)
 
 

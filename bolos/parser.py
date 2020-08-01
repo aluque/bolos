@@ -73,9 +73,9 @@ def _read_until_sep(fp):
 def _read_block(fp, has_arg=True):
     """ Reads data of a process, contained in a block. 
     has_arg indicates wether we have to read an argument line"""
-    target = fp.next().strip()
+    target = fp.readline().strip()
     if has_arg:
-        arg = fp.next().strip()
+        arg = fp.readline().strip()
     else:
         arg = None
 
