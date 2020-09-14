@@ -476,6 +476,15 @@ class BoltzmannSolver(object):
         return (2 * np.sqrt(1 / np.pi)
                 * kT**(-3./2.) * np.exp(-self.cenergy / kT))
 
+    def invertLinearMatrix(self):
+
+        A = self._scharf_gummel(self.sigma_m) - self._PQCons()
+        A[0, :] = self.denergy * self.cenergy**0.5
+        rhs = np.zeros_like(self.cenergy)
+        rhs[0] = 1
+        f0 = spsolve(A, rhs)
+
+        return self._normalized(f0)
 
     def iterate(self, f0, delta=1e14):
         """ Iterates once the EEDF. 
@@ -505,7 +514,6 @@ class BoltzmannSolver(object):
 
         f1 = spsolve(sparse.eye(self.n) 
                      + delta * A - delta * Q, f0)
-
         return self._normalized(f1)
 
     
@@ -610,12 +618,11 @@ class BoltzmannSolver(object):
 
         elif (self.growth_model==2):
             dF = np.r_[0, np.diff(F) / np.diff(self.cenergy), 0]
-
             sigma_m_c = 0.5 * (self.sigma_m[:-1] + self.sigma_m[1:])
-
-            mu = - GAMMA / 3 * ( integrate.simps(self.benergy*dF/self.sigma_m, x=self.benergy) ) 
-            D = GAMMA / 3 * ( integrate.simps(self.cenergy*F/sigma_m_c, x=self.cenergy) ) 
+            mu = - GAMMA / 3 * integrate.simps(self.benergy*dF/self.sigma_m, x=self.benergy)
+            D = GAMMA / 3 * integrate.simps(self.cenergy*F/sigma_m_c, x=self.cenergy)
             alpha = (mu*self.EN - np.sqrt((mu*self.EN)**2 - 4*D*nu)) / 2 / D
+
 
             G = - alpha * GAMMA / 3 * (alpha * (self.benergy[1:]**2 -
                 self.benergy[:-1]**2) / sigma_m_c / 2 -
@@ -731,26 +738,61 @@ class BoltzmannSolver(object):
 
         return PQ
 
+    def _PQCons(self, reactions=None):
+        """ Treats all the reactions as conservative """
+        PQ = sparse.csr_matrix((self.n, self.n))
+
+        if reactions is None:
+            reactions = list(self.iter_inelastic())
+
+        data = []
+        rows = []
+        cols = []
+        for t, k in reactions:
+            r = t.density * GAMMA * k.scatterings(np.zeros_like(self.cenergy), self.cenergy)
+            
+            data.extend([r, -r])
+            rows.extend([k.i, k.j])
+            cols.extend([k.j, k.j])
+
+        data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
+        PQ = sparse.coo_matrix((data, (rows, cols)),
+                              shape=(self.n, self.n))
+
+        return PQ
+
     def _coulomb(self, F0):
         """ Calculates the coulomb collisions terms as done in the original 2005 paper.
         The calculation is rather costly as it involves three integral calculations """
-        kTe = 2. / 3. * co.e * integrate.simps(self.cenergy**1.5 * F0, self.cenergy)
-        A1_f = np.sqrt(self.cenergy) * F0
-        A1 = np.array([integrate.simps(A1_f[:i+1], 
-                        self.cenergy[:i+1]) for i in range(self.n)])
-        A2_f = self.cenergy**1.5 * F0
-        A2 = np.array([integrate.simps(A2_f[:i+1],
-                        self.cenergy[:i+1]) for i in range(self.n)])
-        A3 = np.array([integrate.simps(F0[i:],
-                        self.cenergy[i:]) for i in range(self.n)])
+        # kTe = 2. / 3. * co.e * integrate.simps(self.cenergy**1.5 * F0, self.cenergy)
+        # A1_f = np.sqrt(self.cenergy) * F0
+        # A1 = np.array([integrate.simps(A1_f[:i+1], 
+        #                 self.cenergy[:i+1]) for i in range(self.n)])
+        # A2_f = self.cenergy**1.5 * F0
+        # A2 = np.array([integrate.simps(A2_f[:i+1],
+        #                 self.cenergy[:i+1]) for i in range(self.n)])
+        # A3 = np.array([integrate.simps(F0[i:],
+        #                 self.cenergy[i:]) for i in range(self.n)])
+
+        # coulomb_param = (12. * np.pi * (co.epsilon_0 * kTe)**1.5 /
+        #                     co.e**3 / np.sqrt(self.electron_density))
+        # a = co.e**2 * GAMMA / 24. / np.pi / co.epsilon_0**2 * np.log(coulomb_param)
+
+        # A1 = np.r_[A1[0], 0.5 * (A1[:-1] + A1[1:]), A1[-1]]
+        # A2 = np.r_[A2[0], 0.5 * (A2[:-1] + A2[1:]), A2[-1]]
+        # A3 = np.r_[A3[0], 0.5 * (A3[:-1] + A3[1:]), A3[-1]]
+
+        bF0 = np.r_[F0[0], 0.5 * (F0[:-1] + F0[1:]), F0[-1]]
+        kTe = 2 / 3 * co.e * integrate.simps(self.benergy**1.5 * bF0, self.benergy)
+        A_tmp = np.sqrt(self.benergy) * bF0
+        A1 = np.array([integrate.simps(A_tmp[:i+1], self.benergy[:i+1]) for i in range(self.n + 1)])
+        A_tmp = self.benergy**1.5 * bF0
+        A2 = np.array([integrate.simps(A_tmp[:i+1], self.benergy[:i+1]) for i in range(self.n + 1)])
+        A3 = np.array([integrate.simps(bF0[i:], self.benergy[i:]) for i in range(self.n + 1)])
 
         coulomb_param = (12. * np.pi * (co.epsilon_0 * kTe)**1.5 /
                             co.e**3 / np.sqrt(self.electron_density))
         a = co.e**2 * GAMMA / 24. / np.pi / co.epsilon_0**2 * np.log(coulomb_param)
-
-        A1 = np.r_[A1[0], 0.5 * (A1[:-1] + A1[1:]), A1[-1]]
-        A2 = np.r_[A2[0], 0.5 * (A2[:-1] + A2[1:]), A2[-1]]
-        A3 = np.r_[A3[0], 0.5 * (A3[:-1] + A3[1:]), A3[-1]]
 
         self.WC = - 3. * a * self.ion_degree * A1
         self.DC = 2. * a * self.ion_degree * (A2 + self.benergy**1.5*A3)
