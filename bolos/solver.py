@@ -142,6 +142,9 @@ class BoltzmannSolver(object):
 
         # Default coulomb cross sections not taken into account
         self.coulomb = False
+
+        # Activation or not of the super elastic cross sections
+        self.super = False
         
     def _get_grid(self):
         return self._grid
@@ -199,6 +202,31 @@ class BoltzmannSolver(object):
 
         self.target[species].density = density
 
+    @staticmethod
+    def super_cs(cs, thres, gdown, gup):
+        """ Computes the super elastic collision  cross section as given by the Klein-Rossland formula """
+        nb = sum(e - thres > 0 for e in cs[:, 0])
+        cs_inv = np.zeros((nb, 2))
+        index = 0
+
+        for i in range(len(cs[:, 0])):
+            if cs[i, 0] - thres > 0:
+                cs_inv[index, 0] = cs[i, 0] - thres
+                cs_inv[index, 1] = cs[i, 1] * gup / gdown * cs[i, 0] / (cs[i, 0] - thres)
+                index += 1
+        return cs_inv
+
+    def create_super(self, p, gup, gdown):
+        """ Creates super-elastic process from direct process p """
+        p_super = {}
+        p_super['target'] = p['product']
+        p_super['product'] = p['target']
+        p_super['comment'] = p['comment']
+        p_super['kind'] = p['kind']
+        p_super['threshold'] = - p['threshold']
+        cs = np.array(p['data'])
+        p_super['data'] = self.super_cs(cs, p['threshold'], gup, gdown) 
+        return p_super
 
     def load_collisions(self, dict_processes):
         """ Loads the set of collisions from the list of processes. 
@@ -223,7 +251,13 @@ class BoltzmannSolver(object):
            solver.
 
         """
-        plist = [self.add_process(**p) for p in dict_processes]
+        plist = []
+        for p in dict_processes:
+            plist.append(self.add_process(**p))
+            # Add the super elastic process if actived and excitation process
+            if p['kind'] == 'EXCITATION' and self.super:
+                p_super = self.create_super(p, 1, 1)
+                plist.append(self.add_process(**p_super))
 
         # We make sure that all targets have their elastic cross-sections
         # in the form of ELASTIC cross sections (not EFFECTIVE / MOMENTUM)
@@ -285,7 +319,6 @@ class BoltzmannSolver(object):
         except KeyError:
             target = Target(proc.target_name)
             self.target[proc.target_name] = target
-
         target.add_process(proc)
 
         return proc
