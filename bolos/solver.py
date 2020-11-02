@@ -512,12 +512,24 @@ class BoltzmannSolver(object):
     def invertLinearMatrix(self):
 
         A = self._scharf_gummel(self.sigma_m) - self._PQCons()
-        A[0, :] = self.denergy * self.cenergy**0.5
+        A[-1, :] = self.denergy * self.cenergy**0.5
         rhs = np.zeros_like(self.cenergy)
-        rhs[0] = 1
+        rhs[-1] = 1
         f0 = spsolve(A, rhs)
 
         return self._normalized(f0)
+    
+    def margenau_eedf(self):
+        """ Implements the margenau EEDF, exact solution of the EEDF with 
+        only elastic collisions on """
+        self.nu_el = np.zeros_like(self.cenergy)
+        for target, process in self.iter_elastic():
+            s = target.density * process.interp(self.cenergy)
+            self.nu_el += s * GAMMA * self.cenergy
+            integrand = 1 / (co.e / 3 / target.mass_ratio / co.m_e * (self.EN / self.nu_el)**2 + self.kT)
+
+        lnF = np.array([- integrate.simps(integrand[:i+1], self.cenergy[:i+1]) for i in range(self.n)])
+        return np.exp(lnF) / self._norm(np.exp(lnF))
 
     def iterate(self, f0, delta=1e14):
         """ Iterates once the EEDF. 
@@ -542,14 +554,10 @@ class BoltzmannSolver(object):
         standard entry point for the iterative solution of the EEDF is
         the :func:`BoltzmannSolver.converge` method.
         """
-
         A, Q = self._linsystem(f0)
-
-        f1 = spsolve(sparse.eye(self.n) 
-                     + delta * A - delta * Q, f0)
+        f1 = spsolve(sparse.eye(self.n) + delta * A - delta * Q, f0)
         return self._normalized(f1)
 
-    
     def converge(self, f0, maxn=100, rtol=1e-5, delta0=1e14, m=4.0,
                  full=False, **kwargs):
         """ Iterates and attempted EEDF until convergence is reached.
@@ -613,6 +621,8 @@ class BoltzmannSolver(object):
                           % (i + 1, err1, rtol))
             if err1 < rtol:
                 logging.info("Convergence achieved after %d iterations. "
+                             "err = %g" % (i + 1, err1))
+                print("Convergence achieved after %d iterations. "
                              "err = %g" % (i + 1, err1))
                 if full:
                     return f1, i + 1, err1
