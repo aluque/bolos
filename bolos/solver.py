@@ -527,9 +527,26 @@ class BoltzmannSolver(object):
             s = target.density * process.interp(self.cenergy)
             self.nu_el += s * GAMMA * self.cenergy
             integrand = 1 / (co.e / 3 / target.mass_ratio / co.m_e * (self.EN / self.nu_el)**2 + self.kT)
-
         lnF = np.array([- integrate.simps(integrand[:i+1], self.cenergy[:i+1]) for i in range(self.n)])
         return np.exp(lnF) / self._norm(np.exp(lnF))
+    
+    def margenau_kT(self):
+        """ Compute the mean elastic collision frequency """
+        self.nu_el = np.zeros_like(self.cenergy)
+        mean_targetmass = 0
+        for target, process in self.iter_elastic():
+            s = target.density * process.interp(self.cenergy)
+            print(f'{target.mass_ratio:.3e}')
+            mean_targetmass += target.density * co.m_e / target.mass_ratio
+            self.nu_el += s * GAMMA * self.cenergy
+        mean_nu = np.mean(self.nu_el)
+        print(f'{co.m_e / mean_targetmass:.3e}')
+        kT_mxw = (co.e * mean_targetmass / 3 / co.m_e**2 * 
+                    (self.EN / mean_nu)**2 + self.kT)
+        return kT_mxw
+    
+    def const_eedf(self, eps_max):
+        return 1.5 * eps_max**(-3/2) * np.ones(self.grid.n)
 
     def iterate(self, f0, delta=1e14):
         """ Iterates once the EEDF. 
@@ -558,8 +575,35 @@ class BoltzmannSolver(object):
         f1 = spsolve(sparse.eye(self.n) + delta * A - delta * Q, f0)
         return self._normalized(f1)
 
-    def converge(self, f0, maxn=100, rtol=1e-5, delta0=1e14, m=4.0,
-                 full=False, **kwargs):
+    def iterate_direct(self, f0, delta=1e14):
+        """ Iterates once the EEDF in a direct fashion (no matrix inversion)
+
+        Parameters
+        ----------
+        f0 : array of floats
+           The previous EEDF
+        delta : float
+           The convergence parameter.  Generally a larger delta leads to faster
+           convergence but a too large value may lead to instabilities or
+           slower convergence.
+
+        Returns
+        -------
+        f1 : array of floats
+           A new value of the distribution function.
+
+        Notes
+        -----
+        This is a low-level routine not intended for normal uses.  The
+        standard entry point for the iterative solution of the EEDF is
+        the :func:`BoltzmannSolver.converge` method.
+        """
+        A, Q = self._linsystem(f0)
+        f1 = (sparse.eye(self.n) - delta * A + delta * Q).dot(f0)
+        return self._normalized(f1)
+
+    def converge(self, f0, maxn=100, rtol=1e-5, delta0=1e18, m=4.0,
+                 full=False, method='implicit', **kwargs):
         """ Iterates and attempted EEDF until convergence is reached.
 
         Parameters
@@ -612,13 +656,17 @@ class BoltzmannSolver(object):
 
                 # Log extrapolation attempting to reduce the error a factor m
                 delta = delta * np.log(m) / (np.log(err0) - np.log(err1))
-                
-            f1 = self.iterate(f0, delta=delta, **kwargs)
+            if method == 'implicit':    
+                f1 = self.iterate(f0, delta=delta, **kwargs)
+            elif method == 'direct':
+                f1 = self.iterate_direct(f0, delta=delta)
             err0 = err1
             err1 = self._norm(abs(f0 - f1))
             
             logging.debug("After iteration %3d, err = %g (target: %g)" 
                           % (i + 1, err1, rtol))
+            print("After iteration %3d, err = %.3e (target: %.3e), delta = %.3e" 
+                          % (i + 1, err1, rtol, delta))
             if err1 < rtol:
                 logging.info("Convergence achieved after %d iterations. "
                              "err = %g" % (i + 1, err1))
