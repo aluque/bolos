@@ -7,11 +7,11 @@ setup(
     long_description="",
 
     # The project URL.
-    url='https://github.com/aluque/bolos',
+    url='https://github.com/lionelchg/bolos',
 
     # Author details
-    author='Alejandro Luque',
-    author_email='aluque@iaa.es',
+    author='Lionel Cheng',
+    author_email='cheng@cerfacs.fr',
 
     # Choose your license
     license='LGPLv2',
@@ -34,8 +34,8 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.8',
     ],
 
     # What does your project relate to?

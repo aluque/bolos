@@ -14,7 +14,10 @@ iteratively with :func:`BoltzmannSolver.converge`.  Finally, methods such as
 to obtain reaction rates and transport parameters for a given EEDF.
 
 """
+from __future__ import absolute_import
 
+from builtins import range
+from builtins import object
 __docformat__ = "restructuredtext en"
 
 import sys
@@ -32,8 +35,8 @@ from scipy import integrate
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
-from process import Process
-from target import Target
+from .process import Process
+from .target import Target
 
 GAMMA = sqrt(2 * co.elementary_charge / co.electron_mass)
 TOWNSEND = 1e-21
@@ -133,6 +136,15 @@ class BoltzmannSolver(object):
 
         # A dictionary with target_name -> target
         self.target = {}
+
+        # Default temporal growth model
+        self.growth_model = 1
+
+        # Default coulomb cross sections not taken into account
+        self.coulomb = False
+
+        # Activation or not of the super elastic cross sections
+        self.super = False
         
     def _get_grid(self):
         return self._grid
@@ -149,8 +161,11 @@ class BoltzmannSolver(object):
         # And these are the deltas
         self.denergy = self.grid.d
 
-        # This is useful when integrating the growth term.
+        # This is useful when integrating the temporal growth term.
         self.denergy32 = self.benergy[1:]**1.5 - self.benergy[:-1]**1.5
+
+        # This is useful when integrating the spatial growth term.
+        self.denergy2 = self.benergy[1:]**2 - self.benergy[:-1]**2
 
         self.n = grid.n
 
@@ -187,6 +202,31 @@ class BoltzmannSolver(object):
 
         self.target[species].density = density
 
+    @staticmethod
+    def super_cs(cs, thres, gdown, gup):
+        """ Computes the super elastic collision  cross section as given by the Klein-Rossland formula """
+        nb = sum(e - thres > 0 for e in cs[:, 0])
+        cs_inv = np.zeros((nb, 2))
+        index = 0
+
+        for i in range(len(cs[:, 0])):
+            if cs[i, 0] - thres > 0:
+                cs_inv[index, 0] = cs[i, 0] - thres
+                cs_inv[index, 1] = cs[i, 1] * gup / gdown * cs[i, 0] / (cs[i, 0] - thres)
+                index += 1
+        return cs_inv
+
+    def create_super(self, p, gup, gdown):
+        """ Creates super-elastic process from direct process p """
+        p_super = {}
+        p_super['target'] = p['product']
+        p_super['product'] = p['target']
+        p_super['comment'] = p['comment']
+        p_super['kind'] = p['kind']
+        p_super['threshold'] = - p['threshold']
+        cs = np.array(p['data'])
+        p_super['data'] = self.super_cs(cs, p['threshold'], gup, gdown) 
+        return p_super
 
     def load_collisions(self, dict_processes):
         """ Loads the set of collisions from the list of processes. 
@@ -211,13 +251,19 @@ class BoltzmannSolver(object):
            solver.
 
         """
-        plist = [self.add_process(**p) for p in dict_processes]
+        plist = []
+        for p in dict_processes:
+            plist.append(self.add_process(**p))
+            # Add the super elastic process if actived and excitation process
+            if p['kind'] == 'EXCITATION' and self.super:
+                p_super = self.create_super(p, 1, 1)
+                plist.append(self.add_process(**p_super))
 
         # We make sure that all targets have their elastic cross-sections
         # in the form of ELASTIC cross sections (not EFFECTIVE / MOMENTUM)
-        for key, item in self.target.iteritems():
+        for key, item in self.target.items():
             item.ensure_elastic()
-            
+
         return plist
 
     def add_process(self, **kwargs):
@@ -273,7 +319,6 @@ class BoltzmannSolver(object):
         except KeyError:
             target = Target(proc.target_name)
             self.target[proc.target_name] = target
-
         target.add_process(proc)
 
         return proc
@@ -328,7 +373,7 @@ class BoltzmannSolver(object):
         An iterator over (target, process) tuples. 
         """
 
-        for target in self.target.values():
+        for target in list(self.target.values()):
             if target.density > 0:
                 for process in target.elastic:
                     yield target, process
@@ -344,7 +389,7 @@ class BoltzmannSolver(object):
         -------
         An iterator over (target, process) tuples. """
 
-        for target in self.target.values():
+        for target in list(self.target.values()):
             if target.density > 0:
                 for process in target.inelastic:
                     yield target, process
@@ -362,7 +407,7 @@ class BoltzmannSolver(object):
         An iterator over (target, process) tuples. 
 
         """
-        for target in self.target.values():
+        for target in list(self.target.values()):
             if target.density > 0:
                 for process in target.ionization:
                     yield target, process
@@ -464,6 +509,44 @@ class BoltzmannSolver(object):
         return (2 * np.sqrt(1 / np.pi)
                 * kT**(-3./2.) * np.exp(-self.cenergy / kT))
 
+    def invertLinearMatrix(self):
+
+        A = self._scharf_gummel(self.sigma_m) - self._PQCons()
+        A[-1, :] = self.denergy * self.cenergy**0.5
+        rhs = np.zeros_like(self.cenergy)
+        rhs[-1] = 1
+        f0 = spsolve(A, rhs)
+
+        return self._normalized(f0)
+    
+    def margenau_eedf(self):
+        """ Implements the margenau EEDF, exact solution of the EEDF with 
+        only elastic collisions on """
+        self.nu_el = np.zeros_like(self.cenergy)
+        for target, process in self.iter_elastic():
+            s = target.density * process.interp(self.cenergy)
+            self.nu_el += s * GAMMA * self.cenergy
+            integrand = 1 / (co.e / 3 / target.mass_ratio / co.m_e * (self.EN / self.nu_el)**2 + self.kT)
+        lnF = np.array([- integrate.simps(integrand[:i+1], self.cenergy[:i+1]) for i in range(self.n)])
+        return np.exp(lnF) / self._norm(np.exp(lnF))
+    
+    def margenau_kT(self):
+        """ Compute the mean elastic collision frequency """
+        self.nu_el = np.zeros_like(self.cenergy)
+        mean_targetmass = 0
+        for target, process in self.iter_elastic():
+            s = target.density * process.interp(self.cenergy)
+            print(f'{target.mass_ratio:.3e}')
+            mean_targetmass += target.density * co.m_e / target.mass_ratio
+            self.nu_el += s * GAMMA * self.cenergy
+        mean_nu = np.mean(self.nu_el)
+        print(f'{co.m_e / mean_targetmass:.3e}')
+        kT_mxw = (co.e * mean_targetmass / 3 / co.m_e**2 * 
+                    (self.EN / mean_nu)**2 + self.kT)
+        return kT_mxw
+    
+    def const_eedf(self, eps_max):
+        return 1.5 * eps_max**(-3/2) * np.ones(self.grid.n)
 
     def iterate(self, f0, delta=1e14):
         """ Iterates once the EEDF. 
@@ -488,17 +571,39 @@ class BoltzmannSolver(object):
         standard entry point for the iterative solution of the EEDF is
         the :func:`BoltzmannSolver.converge` method.
         """
-
         A, Q = self._linsystem(f0)
-
-        f1 = spsolve(sparse.eye(self.n) 
-                     + delta * A - delta * Q, f0)
-
+        f1 = spsolve(sparse.eye(self.n) + delta * A - delta * Q, f0)
         return self._normalized(f1)
 
-    
-    def converge(self, f0, maxn=100, rtol=1e-5, delta0=1e14, m=4.0,
-                 full=False, **kwargs):
+    def iterate_direct(self, f0, delta=1e14):
+        """ Iterates once the EEDF in a direct fashion (no matrix inversion)
+
+        Parameters
+        ----------
+        f0 : array of floats
+           The previous EEDF
+        delta : float
+           The convergence parameter.  Generally a larger delta leads to faster
+           convergence but a too large value may lead to instabilities or
+           slower convergence.
+
+        Returns
+        -------
+        f1 : array of floats
+           A new value of the distribution function.
+
+        Notes
+        -----
+        This is a low-level routine not intended for normal uses.  The
+        standard entry point for the iterative solution of the EEDF is
+        the :func:`BoltzmannSolver.converge` method.
+        """
+        A, Q = self._linsystem(f0)
+        f1 = (sparse.eye(self.n) - delta * A + delta * Q).dot(f0)
+        return self._normalized(f1)
+
+    def converge(self, f0, maxn=100, rtol=1e-5, delta0=1e18, m=4.0,
+                 full=False, method='implicit', **kwargs):
         """ Iterates and attempted EEDF until convergence is reached.
 
         Parameters
@@ -542,7 +647,7 @@ class BoltzmannSolver(object):
         err0 = err1 = 0
         delta = delta0
 
-        for i in xrange(maxn):
+        for i in range(maxn):
             # If we have already two error estimations we use Richardson
             # extrapolation to obtain a new delta and speed up convergence.
             if 0 < err1 < err0:
@@ -551,15 +656,21 @@ class BoltzmannSolver(object):
 
                 # Log extrapolation attempting to reduce the error a factor m
                 delta = delta * np.log(m) / (np.log(err0) - np.log(err1))
-                
-            f1 = self.iterate(f0, delta=delta, **kwargs)
+            if method == 'implicit':    
+                f1 = self.iterate(f0, delta=delta, **kwargs)
+            elif method == 'direct':
+                f1 = self.iterate_direct(f0, delta=delta)
             err0 = err1
             err1 = self._norm(abs(f0 - f1))
             
             logging.debug("After iteration %3d, err = %g (target: %g)" 
                           % (i + 1, err1, rtol))
+            print("After iteration %3d, err = %.3e (target: %.3e), delta = %.3e" 
+                          % (i + 1, err1, rtol, delta))
             if err1 < rtol:
                 logging.info("Convergence achieved after %d iterations. "
+                             "err = %g" % (i + 1, err1))
+                print("Convergence achieved after %d iterations. "
                              "err = %g" % (i + 1, err1))
                 if full:
                     return f1, i + 1, err1
@@ -573,6 +684,8 @@ class BoltzmannSolver(object):
 
 
     def _linsystem(self, F):
+        """ Constructs the matrix and the right hand side of the linear system depending on the growth model
+        growth_model == 0 (None), 1 (Temporal), 2 (Spatial) """
         Q = self._PQ(F)
 
         # Useful for debugging but wasteful in normal times.
@@ -581,12 +694,36 @@ class BoltzmannSolver(object):
 
         nu = np.sum(Q.dot(F))
 
-        sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy) / GAMMA
+        if (self.growth_model==0):
+            A = self._scharf_gummel(self.sigma_m)
 
-        # The R (G) term, which we add to A.
-        G = 2 * self.denergy32 * nu / 3
+        elif (self.growth_model==1):
+            sigma_tilde = self.sigma_m + nu / np.sqrt(self.benergy) / GAMMA
 
-        A = self._scharf_gummel(sigma_tilde, G)
+            # The R (G) term, which we add to A.
+            G = 2 * self.denergy32 * nu / 3
+
+            if (self.coulomb): self._coulomb(F)
+
+            A = self._scharf_gummel(sigma_tilde, G)
+
+        elif (self.growth_model==2):
+            dF = np.r_[0, np.diff(F) / np.diff(self.cenergy), 0]
+            sigma_m_c = 0.5 * (self.sigma_m[:-1] + self.sigma_m[1:])
+            mu = - GAMMA / 3 * integrate.simps(self.benergy*dF/self.sigma_m, x=self.benergy)
+            D = GAMMA / 3 * integrate.simps(self.cenergy*F/sigma_m_c, x=self.cenergy)
+            alpha = (mu*self.EN - np.sqrt((mu*self.EN)**2 - 4*D*nu)) / 2 / D
+
+
+            G = - alpha * GAMMA / 3 * (alpha * (self.benergy[1:]**2 -
+                self.benergy[:-1]**2) / sigma_m_c / 2 -
+                self.EN * (self.benergy[1:]/self.sigma_m[1:] - self.benergy[:-1]/self.sigma_m[:-1]))
+
+            self.WS = - 2 / 3 * GAMMA * alpha * self.EN * self.benergy / self.sigma_m
+
+            if (self.coulomb): self._coulomb(F)
+
+            A = self._scharf_gummel(self.sigma_m, G)
 
         # if np.any(np.isnan(A.todense())):
         #     raise ValueError("NaN found in A")
@@ -612,10 +749,26 @@ class BoltzmannSolver(object):
         # used.
         # TODO: Perhaps it would be easier simply to set the appropriate
         # values here to satisfy the b.c.
-        z  = self.W * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
-
-        a0 = self.W / (1 - np.exp(-z))
-        a1 = self.W / (1 - np.exp(z))
+        if self.growth_model<=1:
+            if self.coulomb:
+                D += self.DC
+                z  = (self.W + self.WC) * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = (self.W + self.WC) / (1 - np.exp(-z))
+                a1 = (self.W + self.WC) / (1 - np.exp(z))
+            else:
+                z  = self.W * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = self.W / (1 - np.exp(-z))
+                a1 = self.W / (1 - np.exp(z))
+        elif self.growth_model==2:
+            if self.coulomb:
+                D += self.DC
+                z  = (self.W + self.WC + self.WS) * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = (self.W + self.WC + self.WS) / (1 - np.exp(-z))
+                a1 = (self.W + self.WC + self.WS) / (1 - np.exp(z))
+            else:
+                z  = (self.W + self.WS) * np.r_[np.nan, np.diff(self.cenergy), np.nan] / D
+                a0 = (self.W + self.WS) / (1 - np.exp(-z))
+                a1 = (self.W + self.WS) / (1 - np.exp(z))
 
         diags = np.zeros((3, self.n))
 
@@ -626,7 +779,7 @@ class BoltzmannSolver(object):
         diags[1, :]  =  a1[:-1]
         diags[2, :]  = -a0[1:]
 
-        # F[n+1] = 2 * F[n] + F[n-1] b.c.
+        # F[n+1] = 2 * F[n] - F[n-1] b.c.
         # diags[2, -2] -= a1[-1]
         # diags[0, -1] += 2 * a1[-1]
 
@@ -676,6 +829,65 @@ class BoltzmannSolver(object):
 
         return PQ
 
+    def _PQCons(self, reactions=None):
+        """ Treats all the reactions as conservative """
+        PQ = sparse.csr_matrix((self.n, self.n))
+
+        if reactions is None:
+            reactions = list(self.iter_inelastic())
+
+        data = []
+        rows = []
+        cols = []
+        for t, k in reactions:
+            r = t.density * GAMMA * k.scatterings(np.zeros_like(self.cenergy), self.cenergy)
+            
+            data.extend([r, -r])
+            rows.extend([k.i, k.j])
+            cols.extend([k.j, k.j])
+
+        data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
+        PQ = sparse.coo_matrix((data, (rows, cols)),
+                              shape=(self.n, self.n))
+
+        return PQ
+
+    def _coulomb(self, F0):
+        """ Calculates the coulomb collisions terms as done in the original 2005 paper.
+        The calculation is rather costly as it involves three integral calculations """
+        # kTe = 2. / 3. * co.e * integrate.simps(self.cenergy**1.5 * F0, self.cenergy)
+        # A1_f = np.sqrt(self.cenergy) * F0
+        # A1 = np.array([integrate.simps(A1_f[:i+1], 
+        #                 self.cenergy[:i+1]) for i in range(self.n)])
+        # A2_f = self.cenergy**1.5 * F0
+        # A2 = np.array([integrate.simps(A2_f[:i+1],
+        #                 self.cenergy[:i+1]) for i in range(self.n)])
+        # A3 = np.array([integrate.simps(F0[i:],
+        #                 self.cenergy[i:]) for i in range(self.n)])
+
+        # coulomb_param = (12. * np.pi * (co.epsilon_0 * kTe)**1.5 /
+        #                     co.e**3 / np.sqrt(self.electron_density))
+        # a = co.e**2 * GAMMA / 24. / np.pi / co.epsilon_0**2 * np.log(coulomb_param)
+
+        # A1 = np.r_[A1[0], 0.5 * (A1[:-1] + A1[1:]), A1[-1]]
+        # A2 = np.r_[A2[0], 0.5 * (A2[:-1] + A2[1:]), A2[-1]]
+        # A3 = np.r_[A3[0], 0.5 * (A3[:-1] + A3[1:]), A3[-1]]
+
+        bF0 = np.r_[F0[0], 0.5 * (F0[:-1] + F0[1:]), F0[-1]]
+        kTe = 2 / 3 * co.e * integrate.simps(self.benergy**1.5 * bF0, self.benergy)
+        A_tmp = np.sqrt(self.benergy) * bF0
+        A1 = np.array([integrate.simps(A_tmp[:i+1], self.benergy[:i+1]) for i in range(self.n + 1)])
+        A_tmp = self.benergy**1.5 * bF0
+        A2 = np.array([integrate.simps(A_tmp[:i+1], self.benergy[:i+1]) for i in range(self.n + 1)])
+        A3 = np.array([integrate.simps(bF0[i:], self.benergy[i:]) for i in range(self.n + 1)])
+
+        coulomb_param = (12. * np.pi * (co.epsilon_0 * kTe)**1.5 /
+                            co.e**3 / np.sqrt(self.electron_density))
+        a = co.e**2 * GAMMA / 24. / np.pi / co.epsilon_0**2 * np.log(coulomb_param)
+
+        self.WC = - 3. * a * self.ion_degree * A1
+        self.DC = 2. * a * self.ion_degree * (A2 + self.benergy**1.5*A3)
+
     ##
     # Now some functions to calculate rates transport parameters from the
     # converged F0        
@@ -709,7 +921,7 @@ class BoltzmannSolver(object):
         """
         g = self._g(F0)
 
-        if isinstance(k, (str, unicode)):
+        if isinstance(k, str):
             k = self.search(k)
 
         k.set_grid_cache(self.grid)

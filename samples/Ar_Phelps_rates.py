@@ -19,6 +19,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as co
+sys.path.append('/Users/cheng/CODE/BOLTZMANN_SOLVER/bolos-master')
 from bolos import parser, solver, grid
 
 def parse_args():
@@ -51,9 +52,9 @@ def main():
                             level=logging.DEBUG)
 
     temp = 300
-    E_N = [0.1, 20, 100]
-    maxgrid = [20, 60, 60]
-    inital_energy = [0.1, 1, 2]
+    E_N = np.linspace(30, 600, 31)
+    maxgrid = np.linspace(20, 180, 31)
+    inital_energy = np.linspace(5, 12, 31)
     fichier_out = open("IST_Lisbon_air_bolos.dat","w")
 
     for index, reduced_e in enumerate(E_N):

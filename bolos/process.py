@@ -1,3 +1,5 @@
+from builtins import str
+from builtins import object
 import logging
 
 import numpy as np
@@ -79,7 +81,7 @@ class Process(object):
         cell i shifted. 
         """
 
-        # We will create an arras with matching 
+        # We will create an array with matching 
         # rows ([i], [j], [eps1, eps2], [sigma1, sigma2])
         # that contain the overlap between the shifted cell i and cell j.
         # However we may have more than one row for a given i, j if 
