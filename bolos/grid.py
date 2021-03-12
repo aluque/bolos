@@ -1,5 +1,6 @@
 """ Routines to handle different kinds of grids (linear, quadratic, logarithmic)
 """
+from builtins import object
 import numpy as np
 from scipy.interpolate import interp1d
 
