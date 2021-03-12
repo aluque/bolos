@@ -89,15 +89,15 @@ def main():
     
     # You can also iterate over all processes or over processes of a certain
     # type.
-    print "\nREACTION RATES:\n"
+    print("\nREACTION RATES:\n")
     for t, p in bsolver.iter_all():
-        print "%-40s   %.3e m^3/s" % (str(p), bsolver.rate(f1, p))
+        print("%-40s   %.3e m^3/s" % (str(p), bsolver.rate(f1, p)))
 
     # Calculate the mobility and diffusion.
-    print "\nTRANSPORT PARAMETERS:\n"
-    print "mobility * N   = %.3e  1/m/V/s" % bsolver.mobility(f1)
-    print "diffusion * N  = %.3e  1/m/s" % bsolver.diffusion(f1)
-    print "average energy = %.3e  eV" % bsolver.mean_energy(f1)
+    print("\nTRANSPORT PARAMETERS:\n")
+    print("mobility * N   = %.3e  1/m/V/s" % bsolver.mobility(f1))
+    print("diffusion * N  = %.3e  1/m/s" % bsolver.diffusion(f1))
+    print("average energy = %.3e  eV" % bsolver.mean_energy(f1))
 
     import pylab
     pylab.plot(bsolver.grid.c, f1)
