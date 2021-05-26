@@ -136,15 +136,6 @@ class BoltzmannSolver(object):
 
         # A dictionary with target_name -> target
         self.target = {}
-
-        self.n_processes = {"ELASTIC": 0,
-                            "EFFECTIVE": 0,
-                            "MOMENTUM": 0,
-                            "ATTACHMENT": 0,
-                            "EXCITATION": 0,
-                            "WEIGHTED_ELASTIC": 0,
-                            "INELASTIC": 0
-                            }
     
     def _get_grid(self):
         return self._grid
@@ -287,8 +278,6 @@ class BoltzmannSolver(object):
             self.target[proc.target_name] = target
 
         target.add_process(proc)
-
-        self._count_process(proc)
 
         return proc
 
@@ -584,16 +573,6 @@ class BoltzmannSolver(object):
         logging.error("Convergence failed")
 
         raise ConvergenceError()
-
-
-    def _count_process(self, process: Process):
-        
-        self.n_processes[process.kind] += 1
-
-        inelastic_processes = ["IONIZATION", "ATTACHMENT", "EXCITATION"]
-
-        if process.kind in inelastic_processes:
-            self.n_processes["INELASTIC"] += 1
 
 
     def _linsystem(self, F):
