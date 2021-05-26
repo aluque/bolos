@@ -689,9 +689,9 @@ class BoltzmannSolver(object):
         data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
         PQ = sparse.coo_matrix((data, (rows, cols)),
                             shape=(self.n, self.n))
-        else:
+        #else:
             # There are no inelastic collisions
-            PQ = sparse.coo_matrix((self.n, self.n))
+        #    PQ = sparse.coo_matrix((self.n, self.n))
 
         return PQ
 
