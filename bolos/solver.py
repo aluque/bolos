@@ -137,11 +137,13 @@ class BoltzmannSolver(object):
         # A dictionary with target_name -> target
         self.target = {}
 
-        self.n_processes = {"elastic": 0,
-                            "inelastic": 0,
-                            "ionization": 0,
-                            "attachment": 0,
-                            "excitation": 0
+        self.n_processes = {"ELASTIC": 0,
+                            "EFFECTIVE": 0,
+                            "MOMENTUM": 0,
+                            "ATTACHMENT": 0,
+                            "EXCITATION": 0,
+                            "WEIGHTED_ELASTIC": 0,
+                            "INELASTIC": 0
                             }
     
     def _get_grid(self):
@@ -585,8 +587,14 @@ class BoltzmannSolver(object):
 
 
     def _count_process(self, process: Process):
+        
+        self.n_processes[process.kind] += 1
 
-        print(process.kind)
+        inelastic_processes = ["IONIZATION", "ATTACHMENT", "EXCITATION"]
+
+        if process.kind in inelastic_processes:
+            self.n_processes["INELASTIC"] += 1
+
 
     def _linsystem(self, F):
         Q = self._PQ(F)
@@ -674,6 +682,8 @@ class BoltzmannSolver(object):
         g = self._g(F0)
         if reactions is None:
             reactions = list(self.iter_inelastic())
+
+        print(self.n_processes)
 
         data = []
         rows = []
