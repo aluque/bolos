@@ -136,6 +136,8 @@ class BoltzmannSolver(object):
 
         # A dictionary with target_name -> target
         self.target = {}
+
+        print("HEEEEEEEEEEEELP")
         
     def _get_grid(self):
         return self._grid
