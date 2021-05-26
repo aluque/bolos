@@ -681,14 +681,12 @@ class BoltzmannSolver(object):
 
         g = self._g(F0)
         if reactions is None:
-            if self.n_processes["INELASTIC"] == 0:
-                return sparse.coo_matrix((self.n, self.n))
-            else:
-                reactions = list(self.iter_inelastic())
+            reactions = list(self.iter_inelastic())
 
         data = []
         rows = []
         cols = []
+        n_reactions = 0
         for t, k in reactions:
             r = t.density * GAMMA * k.scatterings(g, self.cenergy)
             in_factor = k.in_factor
@@ -696,12 +694,15 @@ class BoltzmannSolver(object):
             data.extend([in_factor * r, -r])
             rows.extend([k.i, k.j])
             cols.extend([k.j, k.j])
+            n_reactions += 1
 
-        data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
-        PQ = sparse.coo_matrix((data, (rows, cols)),
-                            shape=(self.n, self.n))
-
-        return PQ
+        if n_reactions == 0:
+            return sparse.coo_matrix((self.n, self.n))
+        else:
+            data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
+            PQ = sparse.coo_matrix((data, (rows, cols)),
+                                shape=(self.n, self.n))
+            return PQ
 
     ##
     # Now some functions to calculate rates transport parameters from the
