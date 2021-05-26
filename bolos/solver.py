@@ -669,7 +669,6 @@ class BoltzmannSolver(object):
 
 
     def _PQ(self, F0, reactions=None):
-        print("PQing HARD")
         PQ = sparse.csr_matrix((self.n, self.n))
 
         g = self._g(F0)
