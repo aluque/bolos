@@ -681,9 +681,10 @@ class BoltzmannSolver(object):
 
         g = self._g(F0)
         if reactions is None:
-            reactions = list(self.iter_inelastic())
-
-        print(self.n_processes)
+            if self.n_processes["INELASTIC"] == 0:
+                return sparse.coo_matrix((self.n, self.n))
+            else:
+                reactions = list(self.iter_inelastic())
 
         data = []
         rows = []
@@ -699,9 +700,6 @@ class BoltzmannSolver(object):
         data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
         PQ = sparse.coo_matrix((data, (rows, cols)),
                             shape=(self.n, self.n))
-        #else:
-            # There are no inelastic collisions
-        #    PQ = sparse.coo_matrix((self.n, self.n))
 
         return PQ
 
