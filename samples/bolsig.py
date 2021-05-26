@@ -103,7 +103,7 @@ def main():
         bolos[i, :] = [bsolver.rate(f2, p) for p in processes]
     
     for k, p in enumerate(processes):
-        print "%.3d:  %-40s   %s eV" % (k, p, p.threshold or 0.0)
+        print("%.3d:  %-40s   %s eV" % (k, p, p.threshold or 0.0))
         
         plt.clf()
         plt.figure(figsize=(8, 8))
