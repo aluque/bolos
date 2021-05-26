@@ -137,8 +137,13 @@ class BoltzmannSolver(object):
         # A dictionary with target_name -> target
         self.target = {}
 
-        print("HEEEEEEEEEEEELP")
-        
+        self.n_processes = {"elastic": 0,
+                            "inelastic": 0,
+                            "ionization": 0,
+                            "attachment": 0,
+                            "excitation": 0
+                            }
+    
     def _get_grid(self):
         return self._grid
 
@@ -280,6 +285,8 @@ class BoltzmannSolver(object):
             self.target[proc.target_name] = target
 
         target.add_process(proc)
+
+        self._count_process(proc)
 
         return proc
 
@@ -577,6 +584,10 @@ class BoltzmannSolver(object):
         raise ConvergenceError()
 
 
+    def _count_process(self, process: Process):
+
+        print(process.kind)
+
     def _linsystem(self, F):
         Q = self._PQ(F)
 
@@ -665,22 +676,20 @@ class BoltzmannSolver(object):
         if reactions is None:
             reactions = list(self.iter_inelastic())
 
-        if len(reactions) > 0:
+        data = []
+        rows = []
+        cols = []
+        for t, k in reactions:
+            r = t.density * GAMMA * k.scatterings(g, self.cenergy)
+            in_factor = k.in_factor
+            
+            data.extend([in_factor * r, -r])
+            rows.extend([k.i, k.j])
+            cols.extend([k.j, k.j])
 
-            data = []
-            rows = []
-            cols = []
-            for t, k in reactions:
-                r = t.density * GAMMA * k.scatterings(g, self.cenergy)
-                in_factor = k.in_factor
-                
-                data.extend([in_factor * r, -r])
-                rows.extend([k.i, k.j])
-                cols.extend([k.j, k.j])
-
-            data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
-            PQ = sparse.coo_matrix((data, (rows, cols)),
-                                shape=(self.n, self.n))
+        data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
+        PQ = sparse.coo_matrix((data, (rows, cols)),
+                            shape=(self.n, self.n))
         else:
             # There are no inelastic collisions
             PQ = sparse.coo_matrix((self.n, self.n))
