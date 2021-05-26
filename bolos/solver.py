@@ -656,26 +656,32 @@ class BoltzmannSolver(object):
 
 
     def _PQ(self, F0, reactions=None):
+        print("PQing HARD")
         PQ = sparse.csr_matrix((self.n, self.n))
 
         g = self._g(F0)
         if reactions is None:
             reactions = list(self.iter_inelastic())
 
-        data = []
-        rows = []
-        cols = []
-        for t, k in reactions:
-            r = t.density * GAMMA * k.scatterings(g, self.cenergy)
-            in_factor = k.in_factor
-            
-            data.extend([in_factor * r, -r])
-            rows.extend([k.i, k.j])
-            cols.extend([k.j, k.j])
+        if len(reactions) > 0:
 
-        data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
-        PQ = sparse.coo_matrix((data, (rows, cols)),
-                              shape=(self.n, self.n))
+            data = []
+            rows = []
+            cols = []
+            for t, k in reactions:
+                r = t.density * GAMMA * k.scatterings(g, self.cenergy)
+                in_factor = k.in_factor
+                
+                data.extend([in_factor * r, -r])
+                rows.extend([k.i, k.j])
+                cols.extend([k.j, k.j])
+
+            data, rows, cols = (np.hstack(x) for x in (data, rows, cols))
+            PQ = sparse.coo_matrix((data, (rows, cols)),
+                                shape=(self.n, self.n))
+        else:
+            # There are no inelastic collisions
+            PQ = sparse.coo_matrix((self.n, self.n))
 
         return PQ
 
